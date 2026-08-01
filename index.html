@@ -3,160 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS Core - Control Center</title>
+    <title>JARVIS Core</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f12; color: #e4e4ed; padding: 20px; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-between; box-sizing: border-box; }
-        h2 { color: #8ab4f8; text-align: center; margin: 0 0 10px 0; font-size: 1.4rem; }
-        
-        .dashboard { background: #181824; border: 1px solid #2a2a38; border-radius: 10px; padding: 10px 15px; margin-bottom: 15px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; font-size: 0.85rem; }
-        .stat-item { color: #aaa; }
-        .stat-val { color: #8ab4f8; font-weight: bold; }
-        .btn-small { padding: 6px 12px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
-        
-        #chat { flex-grow: 1; border: 1px solid #2a2a35; padding: 15px; margin-bottom: 15px; overflow-y: auto; background: #16161f; border-radius: 12px; }
-        .user-line { margin: 10px 0; color: #e4e4ed; }
-        .system-line { margin: 10px 0; color: #8ab4f8; font-style: italic; }
-        .warn-line { margin: 10px 0; color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; word-break: break-all; }
-        .agent-line { margin: 10px 0; color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #8ab4f8; white-space: pre-wrap; line-height: 1.4; }
-        
-        .config-box { margin-bottom: 15px; }
-        input[type="password"], input[type="text"] { width: 100%; padding: 12px; background: #22222e; color: #fff; border: 1px solid #3a3a4c; border-radius: 8px; outline: none; box-sizing: border-box; }
-        .msg-box { display: flex; gap: 10px; width: 100%; }
-        .btn-send { padding: 12px 24px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        body { font-family: sans-serif; background: #0f0f12; color: #fff; padding: 15px; margin: 0; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+        h2 { color: #8ab4f8; margin: 0 0 10px 0; }
+        .dash { background: #181824; padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
+        #chat { flex-grow: 1; background: #16161f; border-radius: 8px; padding: 10px; overflow-y: auto; margin-bottom: 10px; }
+        .user { color: #e4e4ed; margin: 8px 0; }
+        .agent { color: #a8d5ba; background: #1e1e2d; padding: 10px; border-radius: 6px; margin: 8px 0; white-space: pre-wrap; }
+        .warn { color: #ff6b6b; background: #2d1e1e; padding: 8px; border-radius: 6px; margin: 8px 0; word-break: break-all; }
+        input[type="password"], input[type="text"] { width: 100%; padding: 10px; background: #22222e; color: #fff; border: 1px solid #3a3a4c; border-radius: 6px; box-sizing: border-box; }
+        .input-row { display: flex; gap: 8px; margin-top: 5px; }
+        button { padding: 10px 15px; background: #8ab4f8; color: #000; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
     <h2>🤖 JARVIS CORE</h2>
-    
-    <div class="dashboard">
-        <div class="stat-item">Session-Puffer: <span class="stat-val" id="sessionQuota">100</span> / 100</div>
-        <div class="stat-item">Tages-Verbrauch: <span class="stat-val" id="dailyTotal">0</span> / 1400</div>
-        <button class="btn-small" onclick="releaseQuota(100)">+ 100 Freigeben</button>
+    <div class="dash">
+        <span>Quota: <b id="qVal">100</b> / 100</span>
+        <button onclick="addQ()">+100</button>
     </div>
-
-    <div class="config-box">
-        <input type="password" id="apiKey" placeholder="Gemini API-Key hier einfügen..." onchange="localStorage.setItem('jarvis_gemini_key', this.value.trim())">
+    <div style="margin-bottom:10px;">
+        <input type="password" id="key" placeholder="Gemini API Key..." onchange="localStorage.setItem('j_key', this.value.trim())">
     </div>
-
-    <div id="chat"><div class="system-line">JARVIS Core bereit. Verbinde mit Gemini API...</div></div>
-    
-    <div class="msg-box">
-        <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
-        <button class="btn-send" onclick="send()">Senden</button>
+    <div id="chat"><i>Bereit...</i></div>
+    <div class="input-row">
+        <input type="text" id="msg" placeholder="Befehl..." onkeypress="if(event.key==='Enter') send()">
+        <button onclick="send()">Senden</button>
     </div>
 
     <script>
-        document.getElementById('apiKey').value = localStorage.getItem('jarvis_gemini_key') || '';
-        
-        let sessionQuota = 100;
-        let dailyTotal = parseInt(localStorage.getItem('jarvis_daily_total') || '0');
-        let lastRequests = [];
+        document.getElementById('key').value = localStorage.getItem('j_key') || '';
+        let quota = 100;
 
-        document.getElementById('dailyTotal').innerText = dailyTotal;
-
-        function releaseQuota(amount) {
-            sessionQuota += amount;
-            document.getElementById('sessionQuota').innerText = sessionQuota;
-            addSystemMsg(`✅ Extra-Puffer freigegeben (+${amount}). Verfügbar: ${sessionQuota}`);
-        }
-
-        function detectLoop(promptText) {
-            let now = Date.now();
-            lastRequests = lastRequests.filter(r => (now - r.time) < 30000);
-            let duplicates = lastRequests.filter(r => r.prompt === promptText);
-            lastRequests.push({ prompt: promptText, time: now });
-            return duplicates.length >= 2;
+        function addQ() {
+            quota += 100;
+            document.getElementById('qVal').innerText = quota;
         }
 
         async function send() {
-            let key = document.getElementById('apiKey').value.trim();
-            let msgInput = document.getElementById('msg');
-            let msg = msgInput.value.trim();
-            let chat = document.getElementById('chat');
+            let k = document.getElementById('key').value.trim();
+            let m = document.getElementById('msg').value.trim();
+            let c = document.getElementById('chat');
 
-            if(!key) { alert('Bitte trage zuerst deinen Gemini API-Key in das Textfeld ein!'); return; }
-            if(!msg) return;
+            if(!k) { alert('API-Key fehlt!'); return; }
+            if(!m) return;
+            if(quota <= 0) { alert('Quota leer!'); return; }
 
-            if(sessionQuota <= 0) {
-                addWarnMsg("⚠️ Session-Limit erreicht! Klicke oben auf '+ 100 Freigeben'.");
-                return;
-            }
+            c.innerHTML += `<div class="user"><b>Du:</b> ${m}</div>`;
+            document.getElementById('msg').value = '';
+            
+            let load = document.createElement('div');
+            load.innerText = 'JARVIS denkt nach...';
+            c.appendChild(load);
 
-            if(detectLoop(msg)) {
-                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert.");
-                return;
-            }
-
-            chat.innerHTML += '<div class="user-line"><b>Du:</b> ' + escapeHtml(msg) + '</div>';
-            msgInput.value = '';
-            chat.scrollTop = chat.scrollHeight;
-
-            chat.innerHTML += '<div class="system-line" id="loading">➔ JARVIS antwortet gleich...</div>';
-            chat.scrollTop = chat.scrollHeight;
-
-            // Anweisung laden
-            let systemPrompt = "Du bist JARVIS, ein autonomer Assistent.";
             try {
-                let instructRes = await fetch("instructions.md?t=" + new Date().getTime());
-                if(instructRes.ok) systemPrompt = await instructRes.text();
-            } catch(e){}
-
-            // Stabiler, aktueller Endpunkt für Google AI Studio Free-Tier Keys
-            try {
-                let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${key}`;
-                
-                let response = await fetch(url, {
+                let res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${k}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        system_instruction: { parts: [{ text: systemPrompt }] },
-                        contents: [{ parts: [{ text: msg }] }]
-                    })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: m }] }] })
                 });
 
-                let data = await response.json();
-                removeLoader();
+                let data = await res.json();
+                load.remove();
 
-                if (response.ok && data.candidates && data.candidates[0].content.parts[0].text) {
-                    let reply = data.candidates[0].content.parts[0].text;
-                    chat.innerHTML += '<div class="agent-line"><b>JARVIS:</b><br>' + escapeHtml(reply) + '</div>';
-                    
-                    sessionQuota--;
-                    dailyTotal++;
-                    document.getElementById('sessionQuota').innerText = sessionQuota;
-                    document.getElementById('dailyTotal').innerText = dailyTotal;
-                    localStorage.setItem('jarvis_daily_total', dailyTotal);
+                if(res.ok && data.candidates && data.candidates[0].content.parts[0].text) {
+                    let text = data.candidates[0].content.parts[0].text;
+                    c.innerHTML += `<div class="agent"><b>JARVIS:</b><br>${text}</div>`;
+                    quota--;
+                    document.getElementById('qVal').innerText = quota;
                 } else {
-                    let errMessage = data.error ? data.error.message : JSON.stringify(data);
-                    addWarnMsg("⚠️ API-Fehler von Google: " + errMessage);
+                    let err = data.error ? data.error.message : JSON.stringify(data);
+                    c.innerHTML += `<div class="warn">Fehler: ${err}</div>`;
                 }
-            } catch (err) {
-                removeLoader();
-                addWarnMsg("⚠️ Netzwerkausfall/Verbindungsfehler: " + err.message);
+            } catch(e) {
+                load.remove();
+                c.innerHTML += `<div class="warn">Netzwerkfehler: ${e.message}</div>`;
             }
-
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function removeLoader() {
-            let loader = document.getElementById('loading');
-            if(loader) loader.remove();
-        }
-
-        function addSystemMsg(text) {
-            let chat = document.getElementById('chat');
-            chat.innerHTML += '<div class="system-line">' + text + '</div>';
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function addWarnMsg(text) {
-            let chat = document.getElementById('chat');
-            chat.innerHTML += '<div class="warn-line">' + text + '</div>';
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            c.scrollTop = c.scrollHeight;
         }
     </script>
 </body>
