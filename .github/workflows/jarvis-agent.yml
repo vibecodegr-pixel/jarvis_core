@@ -1,0 +1,57 @@
+name: JARVIS Cloud Agent (Hermes)
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Befehl für JARVIS'
+        required: true
+        default: 'System-Check'
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Ollama installieren
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Ollama Server starten und Hermes laden
+        run: |
+          # Startet Ollama im Hintergrund
+          ollama serve &
+          # Kurz warten, bis der Server bereit ist
+          sleep 5
+          # Lädt das Hermes-Modell (z.B. hermes3) herunter
+          ollama pull hermes3
+
+      - name: JARVIS Agent mit Hermes ausführen
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          USER_COMMAND: ${{ github.event.inputs.command }}
+        run: |
+          echo "Führe Befehl mit Hermes aus: $USER_COMMAND"
+          
+          # Hier schickt Ollama den Befehl an das lokale Hermes-Modell
+          RESPONSE=$(ollama run hermes3 "Du bist JARVIS. Führe folgenden Befehl aus: $USER_COMMAND")
+          echo "Antwort von Hermes: $RESPONSE"
+
+          # Benachrichtigung via ntfy.sh ans Handy senden
+          python -c "
+          import urllib.request, os
+          topic = os.environ.get('NTFY_TOPIC', 'jarvis-status-GR-998877')
+          data = f'🤖 Hermes-Agent fertig: {os.environ.get(\"USER_COMMAND\")}'.encode('utf-8')
+          urllib.request.urlopen(f'https://ntfy.sh/{topic}', data=data)
+          "
+
+      - name: Änderungen committen & pushen
+        run: |
+          git config --global user.name 'JARVIS Cloud Agent'
+          git config --global user.email 'agent@jarvis.local'
+          git add .
+          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [Hermes Agent] Automatische Ausführung' && git push)
+
