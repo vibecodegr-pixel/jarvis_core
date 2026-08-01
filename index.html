@@ -181,7 +181,7 @@
             msgInput.value = '';
             chat.scrollTop = chat.scrollHeight;
 
-            chat.innerHTML += `<div class="system-line" id="loading">➔ Verarbeite mit Gemini 1.5 Flash...</div>`;
+            chat.innerHTML += `<div class="system-line" id="loading">➔ Verarbeite mit Gemini 2.5 Flash...</div>`;
             chat.scrollTop = chat.scrollHeight;
 
             let systemPrompt = "Du bist JARVIS, ein autonomer Agent.";
@@ -199,7 +199,7 @@
             updateDisplay();
 
             try {
-                let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+                let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
                 
                 let requestBody = {
                     system_instruction: { parts: [{ text: systemPrompt }] },
@@ -268,7 +268,7 @@
                     }
                 } else {
                     let errMessage = data.error ? data.error.message : JSON.stringify(data);
-                    addWarnMsg(`⚠️ API-Fehler (gemini-1.5-flash): ` + errMessage);
+                    addWarnMsg(`⚠️ API-Fehler (gemini-2.5-flash): ` + errMessage);
                 }
             } catch (err) {
                 removeLoader();
@@ -300,4 +300,4 @@
         }
     </script>
 </body>
-</html> 
+</html>
