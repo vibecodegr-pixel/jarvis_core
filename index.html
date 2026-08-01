@@ -28,11 +28,11 @@
     </style>
 </head>
 <body>
-    <h2>🤖 JARVIS CORE (STABLE FLASH)</h2>
+    <h2>🤖 JARVIS CORE (GEMINI 3.5 FLASH)</h2>
     
     <div class="dashboard">
         <div class="stat-group">
-            <div class="stat-item">🚀 FLASH übrig: <span class="stat-flash" id="flashCount">1500</span>/1500</div>
+            <div class="stat-item">🚀 Anfragen übrig: <span class="stat-flash" id="flashCount">1500</span>/1500</div>
             <div class="stat-item">🛡️ Session-Puffer: <span class="stat-val" id="sessionQuota">100</span></div>
         </div>
         <button class="btn-small" onclick="releaseQuota(100)">+ 100 Puffer</button>
@@ -41,9 +41,10 @@
     <div class="config-box">
         <input type="password" id="apiKey" placeholder="Gemini API-Key eintragen..." oninput="localStorage.setItem('jarvis_gemini_key', this.value.trim())">
         <input type="password" id="ghToken" placeholder="GitHub Personal Access Token eintragen..." oninput="localStorage.setItem('jarvis_gh_token', this.value.trim())">
+        <input type="text" id="modelName" placeholder="Modell-ID..." value="gemini-3.5-flash" oninput="localStorage.setItem('jarvis_model_name', this.value.trim())">
     </div>
 
-    <div id="chat"><div class="system-line">JARVIS Core online. Stabiles Flash-Modul aktiv...</div></div>
+    <div id="chat"><div class="system-line">JARVIS Core online. Gemini 3.5 Flash aktiv...</div></div>
     
     <div class="msg-box">
         <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
@@ -53,6 +54,7 @@
     <script>
         document.getElementById('apiKey').value = localStorage.getItem('jarvis_gemini_key') || '';
         document.getElementById('ghToken').value = localStorage.getItem('jarvis_gh_token') || '';
+        document.getElementById('modelName').value = localStorage.getItem('jarvis_model_name') || 'gemini-3.5-flash';
         
         let todayStr = new Date().toISOString().slice(0, 10);
         let savedDate = localStorage.getItem('jarvis_date');
@@ -160,6 +162,7 @@
         async function send() {
             let key = document.getElementById('apiKey').value.trim();
             let ghToken = document.getElementById('ghToken').value.trim();
+            let modelName = document.getElementById('modelName').value.trim() || 'gemini-3.5-flash';
             let msgInput = document.getElementById('msg');
             let msg = msgInput.value.trim();
             let chat = document.getElementById('chat');
@@ -181,7 +184,7 @@
             msgInput.value = '';
             chat.scrollTop = chat.scrollHeight;
 
-            chat.innerHTML += `<div class="system-line" id="loading">➔ Verarbeite mit Gemini 2.5 Flash...</div>`;
+            chat.innerHTML += `<div class="system-line" id="loading">➔ Verarbeite mit ${modelName}...</div>`;
             chat.scrollTop = chat.scrollHeight;
 
             let systemPrompt = "Du bist JARVIS, ein autonomer Agent.";
@@ -199,7 +202,7 @@
             updateDisplay();
 
             try {
-                let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+                let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
                 
                 let requestBody = {
                     system_instruction: { parts: [{ text: systemPrompt }] },
@@ -255,20 +258,20 @@
                         let followUpData = await followUpRes.json();
                         if (followUpRes.ok && followUpData.candidates && followUpData.candidates[0].content.parts[0].text) {
                             let finalReply = followUpData.candidates[0].content.parts[0].text;
-                            chat.innerHTML += '<div class="agent-line"><b>JARVIS (FLASH):</b><br>' + escapeHtml(finalReply) + '</div>';
+                            chat.innerHTML += `<div class="agent-line"><b>JARVIS (${modelName}):</b><br>` + escapeHtml(finalReply) + '</div>';
                         } else {
                             addSystemMsg(`✅ Tool ausgeführt (${toolResult.status}): ${toolResult.message}`);
                         }
 
                     } else if (part.text) {
                         let reply = part.text;
-                        chat.innerHTML += '<div class="agent-line"><b>JARVIS (FLASH):</b><br>' + escapeHtml(reply) + '</div>';
+                        chat.innerHTML += `<div class="agent-line"><b>JARVIS (${modelName}):</b><br>` + escapeHtml(reply) + '</div>';
                     } else {
                         addWarnMsg("⚠️ Leere Antwort von der Gemini API erhalten.");
                     }
                 } else {
                     let errMessage = data.error ? data.error.message : JSON.stringify(data);
-                    addWarnMsg(`⚠️ API-Fehler (gemini-2.5-flash): ` + errMessage);
+                    addWarnMsg(`⚠️ API-Fehler (${modelName}): ` + errMessage);
                 }
             } catch (err) {
                 removeLoader();
