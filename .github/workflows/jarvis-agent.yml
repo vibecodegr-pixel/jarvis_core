@@ -24,7 +24,7 @@ jobs:
       - name: Abhängigkeiten installieren
         run: |
           python -m pip install --upgrade pip
-          pip install requests
+          pip install huggingface_hub requests
 
       - name: JARVIS über Hugging Face API ausführen
         env:
@@ -33,9 +33,10 @@ jobs:
           USER_COMMAND: ${{ github.event.inputs.command }}
         run: |
           python -c "
-          import requests
           import os
           import time
+          from huggingface_hub import InferenceClient
+          import requests
 
           start_time = time.time()
           token = os.environ.get('HF_TOKEN')
@@ -44,36 +45,19 @@ jobs:
 
           print(f'[Tracking] Starte HF-Inferenz für: {command}')
           
-          url = 'https://api-inference.huggingface.co/models/NousResearch/Hermes-3-Llama-3.1-8B-Instruct'
-          headers = {
-              'Authorization': f'Bearer {token}',
-              'Content-Type': 'application/json'
-          }
-          payload = {
-              'inputs': f'Du bist JARVIS, ein autonomer Software-Agent. Führe folgenden Befehl aus und antworte präzise: {command}',
-              'parameters': {'max_new_tokens': 400, 'return_full_text': False}
-          }
-
           status = 'ERFOLG'
           answer = ''
 
           try:
-              response = requests.post(url, headers=headers, json=payload, timeout=60)
+              # Nutzt den offiziellen Client mit standardisiertem HF-Inference-Provider
+              client = InferenceClient(provider='hf-inference', api_key=token)
               
-              if response.status_code == 503:
-                  print('[Pacing] Modell lädt auf HF-Servern. Warte 15s...')
-                  time.sleep(15)
-                  response = requests.post(url, headers=headers, json=payload, timeout=60)
-
-              response.raise_for_status()
-              res_json = response.json()
-
-              if isinstance(res_json, list) and len(res_json) > 0:
-                  answer = res_json[0].get('generated_text', str(res_json))
-              elif isinstance(res_json, dict):
-                  answer = res_json.get('generated_text', res_json.get('error', str(res_json)))
-              else:
-                  answer = str(res_json)
+              response = client.text_generation(
+                  model='NousResearch/Hermes-3-Llama-3.1-8B-Instruct',
+                  prompt=f'Du bist JARVIS, ein autonomer Software-Agent. Führe folgenden Befehl aus und antworte präzise: {command}',
+                  max_new_tokens=400
+              )
+              answer = response
 
           except Exception as e:
               status = 'FEHLER'
