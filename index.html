@@ -45,7 +45,7 @@
         <input type="text" id="ntfyTopic" placeholder="ntfy.sh Thema (z.B. jarvis-status-GR-998877)..." oninput="localStorage.setItem('jarvis_ntfy_topic', this.value.trim())">
     </div>
 
-    <div id="chat"><div class="system-line">JARVIS Core online. Selbstkorrigierender Modus aktiv...</div></div>
+    <div id="chat"><div class="system-line">JARVIS Core online. Selbstkorrigierender Modus aktiv (Anti-Rate-Limit-Pacing aktiv)...</div></div>
     
     <div class="msg-box">
         <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
@@ -268,6 +268,12 @@
                 
                 let success = false;
                 for (let step = 0; step < 5; step++) {
+                    // Erzwinge eine harte Sicherheitspause von 6 Sekunden ab dem 2. Schritt gegen Google Rate-Limits
+                    if (step > 0) {
+                        addSystemMsg("⏳ Pacing-Sperre aktiv: Warte 6 Sekunden vor dem nächsten Schritt...");
+                        await new Promise(resolve => setTimeout(resolve, 6000));
+                    }
+
                     let requestBody = {
                         system_instruction: { parts: [{ text: systemPrompt }] },
                         contents: contents,
@@ -284,7 +290,6 @@
                     if (!response.ok) {
                         let errMessage = data.error ? data.error.message : JSON.stringify(data);
                         
-                        // Automatische Retry-Logik bei Google Rate-Limit
                         let match = errMessage.match(/Please retry in ([0-9.]+)s/);
                         if (match) {
                             let waitSec = parseFloat(match[1]);
