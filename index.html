@@ -5,78 +5,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JARVIS Core - Control Center</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f12; color: #e4e4ed; padding: 20px; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-between; box-sizing: border-box; }
-        h2 { color: #8ab4f8; text-align: center; margin: 0 0 10px 0; font-size: 1.4rem; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f12; color: #e4e4ed; padding: 15px; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-between; box-sizing: border-box; }
+        h2 { color: #8ab4f8; text-align: center; margin: 0 0 10px 0; font-size: 1.3rem; }
         
-        .dashboard { background: #181824; border: 1px solid #2a2a38; border-radius: 10px; padding: 10px 15px; margin-bottom: 15px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; font-size: 0.85rem; }
+        .dashboard { background: #181824; border: 1px solid #2a2a38; border-radius: 10px; padding: 10px 15px; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; }
+        .stat-group { display: flex; gap: 15px; flex-wrap: wrap; }
         .stat-item { color: #aaa; }
         .stat-val { color: #8ab4f8; font-weight: bold; }
-        .btn-small { padding: 6px 12px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+        .stat-pro { color: #f2a65a; font-weight: bold; }
+        .stat-flash { color: #5cf28e; font-weight: bold; }
+        .btn-small { padding: 6px 12px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.75rem; }
         
-        #chat { flex-grow: 1; border: 1px solid #2a2a35; padding: 15px; margin-bottom: 15px; overflow-y: auto; background: #16161f; border-radius: 12px; }
+        #chat { flex-grow: 1; border: 1px solid #2a2a35; padding: 15px; margin-bottom: 12px; overflow-y: auto; background: #16161f; border-radius: 10px; }
         .user-line { margin: 10px 0; color: #e4e4ed; }
-        .system-line { margin: 10px 0; color: #8ab4f8; font-style: italic; }
-        .warn-line { margin: 10px 0; color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; word-break: break-all; }
-        .agent-line { margin: 10px 0; color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #8ab4f8; white-space: pre-wrap; line-height: 1.4; }
+        .system-line { margin: 10px 0; color: #8ab4f8; font-style: italic; font-size: 0.85rem; }
+        .warn-line { margin: 10px 0; color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; word-break: break-all; font-size: 0.85rem; }
+        .agent-line { margin: 10px 0; color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #8ab4f8; white-space: pre-wrap; line-height: 1.4; font-size: 0.95rem; }
         
-        .config-box { background: #181824; border: 1px solid #2a2a38; border-radius: 10px; padding: 10px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
-        input[type="password"], input[type="text"], select { width: 100%; padding: 12px; background: #22222e; color: #fff; border: 1px solid #3a3a4c; border-radius: 8px; outline: none; box-sizing: border-box; font-size: 0.9rem; }
-        .model-row { display: flex; gap: 10px; }
-        .btn-load { padding: 10px 15px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
-        
-        .msg-box { display: flex; gap: 10px; width: 100%; }
-        .btn-send { padding: 12px 24px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .config-box { margin-bottom: 12px; }
+        input[type="password"], input[type="text"] { width: 100%; padding: 12px; background: #22222e; color: #fff; border: 1px solid #3a3a4c; border-radius: 8px; outline: none; box-sizing: border-box; font-size: 0.9rem; }
+        .msg-box { display: flex; gap: 8px; width: 100%; }
+        .btn-send { padding: 12px 20px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
     </style>
 </head>
 <body>
-    <h2>🤖 JARVIS CORE</h2>
+    <h2>🤖 JARVIS CORE (SMART ROUTER)</h2>
     
     <div class="dashboard">
-        <div class="stat-item">Session: <span class="stat-val" id="sessionQuota">100</span> / 100</div>
-        <div class="stat-item">Tages-Verbrauch: <span class="stat-val" id="dailyTotal">0</span> / 1400</div>
-        <button class="btn-small" onclick="releaseQuota(100)">+ 100 Freigeben</button>
+        <div class="stat-group">
+            <div class="stat-item">⚡ PRO übrig: <span class="stat-pro" id="proCount">50</span>/50</div>
+            <div class="stat-item">🚀 FLASH übrig: <span class="stat-flash" id="flashCount">1500</span>/1500</div>
+            <div class="stat-item">🛡️ Session-Puffer: <span class="stat-val" id="sessionQuota">100</span></div>
+        </div>
+        <button class="btn-small" onclick="releaseQuota(100)">+ 100 Puffer</button>
     </div>
 
     <div class="config-box">
-        <input type="password" id="apiKey" placeholder="Gemini API-Key eintragen..." onchange="saveKey()">
-        <div class="model-row">
-            <button class="btn-load" onclick="loadModels()">1. Modelle laden</button>
-            <select id="modelSelect">
-                <option value="">-- Bitte zuerst 'Modelle laden' klicken --</option>
-            </select>
-        </div>
+        <input type="password" id="apiKey" placeholder="Gemini API-Key eintragen..." onchange="localStorage.setItem('jarvis_gemini_key', this.value.trim())">
     </div>
 
-    <div id="chat"><div class="system-line">JARVIS Core online. Bitte API-Key eintragen und Modelle laden...</div></div>
+    <div id="chat"><div class="system-line">JARVIS Core online. Smart-Router aktiv – bereit für Befehle...</div></div>
     
     <div class="msg-box">
         <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
-        <button class="btn-send" onclick="send()">2. Senden</button>
+        <button class="btn-send" onclick="send()">Senden</button>
     </div>
 
     <script>
-        // 1. Initialisierung & Speicher laden
         document.getElementById('apiKey').value = localStorage.getItem('jarvis_gemini_key') || '';
+        
+        // --- QUOTA & AUTOMATISCHER MITTERNACHTS-RESET ---
+        let todayStr = new Date().toISOString().slice(0, 10);
+        let savedDate = localStorage.getItem('jarvis_date');
+        
+        if (savedDate !== todayStr) {
+            localStorage.setItem('jarvis_date', todayStr);
+            localStorage.setItem('jarvis_pro_used', '0');
+            localStorage.setItem('jarvis_flash_used', '0');
+        }
+
+        let proUsed = parseInt(localStorage.getItem('jarvis_pro_used') || '0');
+        let flashUsed = parseInt(localStorage.getItem('jarvis_flash_used') || '0');
         let sessionQuota = 100;
-        let dailyTotal = parseInt(localStorage.getItem('jarvis_daily_total') || '0');
         let lastRequests = [];
 
-        document.getElementById('dailyTotal').innerText = dailyTotal;
-        
-        // Gespeichertes Modell wiederherstellen falls vorhanden
-        let savedModel = localStorage.getItem('jarvis_selected_model');
-        if(savedModel && document.getElementById('apiKey').value.trim() !== '') {
-            loadModels();
+        function updateDisplay() {
+            let proLeft = Math.max(0, 50 - proUsed);
+            let flashLeft = Math.max(0, 1500 - flashUsed);
+            document.getElementById('proCount').innerText = proLeft;
+            document.getElementById('flashCount').innerText = flashLeft;
+            document.getElementById('sessionQuota').innerText = sessionQuota;
         }
-
-        function saveKey() {
-            localStorage.setItem('jarvis_gemini_key', document.getElementById('apiKey').value.trim());
-        }
+        updateDisplay();
 
         function releaseQuota(amount) {
             sessionQuota += amount;
-            document.getElementById('sessionQuota').innerText = sessionQuota;
-            addSystemMsg(`✅ Extra-Puffer freigegeben (+${amount}). Verfügbar: ${sessionQuota}`);
+            updateDisplay();
+            addSystemMsg(`✅ Session-Puffer um +${amount} erhöht. (Verfügbar: ${sessionQuota})`);
         }
 
         function detectLoop(promptText) {
@@ -87,89 +92,53 @@
             return duplicates.length >= 2;
         }
 
-        // 2. LIVE-MODELLABFRAGE (Deine neue Idee)
-        async function loadModels() {
-            let key = document.getElementById('apiKey').value.trim();
-            let select = document.getElementById('modelSelect');
+        // --- INTELLIGENTER SMART-ROUTER (KOMPLEXITÄTS-ANALYSE) ---
+        function smartRoute(text) {
+            // 1. Erkennt Code-Syntax (Klammern, Zuweisungen, HTML/JS)
+            const hasCodeSyntax = /[{};=<>]/g.test(text) && text.length > 25;
+            
+            // 2. Erkennt Problemlösungs-, Bau- und Analyse-Wörter
+            const techTerms = ['code', 'fehler', 'bug', 'script', 'html', 'css', 'js', 'javascript', 'python', 'json', 'github', 'fix', 'funktioniert nicht', 'wieso', 'warum', 'schleife', 'api', 'repository', 'commit', 'anleitung', 'erkläre', 'optimier', 'schreibe', 'bau', 'system', 'problem'];
+            const lower = text.toLowerCase();
+            const hasTechTerm = techTerms.some(term => lower.includes(term));
+            
+            // 3. Längere und komplexere Anfragen
+            const isLong = text.length > 130;
 
-            if(!key) {
-                alert('Bitte trage zuerst deinen Gemini API-Key in das obere Feld ein!');
-                return;
+            if (hasCodeSyntax || hasTechTerm || isLong) {
+                return { id: "gemini-2.5-pro", name: "PRO 2.5 (Komplex/Code)", isPro: true };
             }
-
-            select.innerHTML = '<option value="">Lade verfügbare Modelle von Google...</option>';
-
-            try {
-                let res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-                let data = await res.json();
-
-                if (data.models && data.models.length > 0) {
-                    select.innerHTML = ''; // Dropdown leeren
-                    let loadedCount = 0;
-
-                    data.models.forEach(m => {
-                        // Prüfen ob das Modell für Chat/Text-Generierung geeignet ist
-                        if (m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent")) {
-                            let opt = document.createElement('option');
-                            // m.name kommt von Google immer sauber im Format "models/gemini-1.5-flash"
-                            opt.value = m.name;
-                            opt.text = m.displayName ? `${m.displayName} (${m.name.replace('models/', '')})` : m.name;
-                            select.appendChild(opt);
-                            loadedCount++;
-                        }
-                    });
-
-                    if (loadedCount === 0) {
-                        select.innerHTML = '<option value="">Keine Text-Modelle gefunden!</option>';
-                        addWarnMsg("⚠️ Der API-Key ist gültig, hat aber keine Rechte für Textmodelle.");
-                    } else {
-                        // Vorheriges Modell auswählen falls vorhanden
-                        if(savedModel) select.value = savedModel;
-                        addSystemMsg(`✅ ${loadedCount} Modelle erfolgreich aus deinem Account geladen! Wähle jetzt eins aus.`);
-                    }
-                } else {
-                    let errorMsg = data.error ? data.error.message : "Keine Modelle zurückgegeben.";
-                    select.innerHTML = `<option value="">Fehler beim Laden</option>`;
-                    addWarnMsg("⚠️ Google API-Fehler beim Modell-Laden: " + errorMsg);
-                }
-            } catch(e) {
-                select.innerHTML = '<option value="">Netzwerkfehler beim Laden</option>';
-                addWarnMsg("⚠️ Netzwerkfehler beim Laden der Modellliste: " + e.message);
-            }
+            return { id: "gemini-2.5-flash", name: "FLASH 2.5 (Standard/Schnell)", isPro: false };
         }
 
-        // Modell-Auswahl bei Änderung speichern
-        document.getElementById('modelSelect').addEventListener('change', function() {
-            localStorage.setItem('jarvis_selected_model', this.value);
-        });
-
-        // 3. BEFEHL SENDEN
+        // --- BEFEHL SENDEN ---
         async function send() {
             let key = document.getElementById('apiKey').value.trim();
-            let selectedModel = document.getElementById('modelSelect').value;
             let msgInput = document.getElementById('msg');
             let msg = msgInput.value.trim();
             let chat = document.getElementById('chat');
 
-            if(!key) { alert('Bitte zuerst den API-Key eingeben!'); return; }
-            if(!selectedModel) { alert('Bitte klicke zuerst auf "1. Modelle laden" und wähle ein Modell aus!'); return; }
+            if(!key) { alert('Bitte trage zuerst deinen Gemini API-Key in das obere Feld ein!'); return; }
             if(!msg) return;
 
             if(sessionQuota <= 0) {
-                addWarnMsg("⚠️ Session-Limit erreicht! Klicke oben auf '+ 100 Freigeben'.");
+                addWarnMsg("⚠️ Session-Puffer leer! Klicke oben auf '+ 100 Puffer'.");
                 return;
             }
 
             if(detectLoop(msg)) {
-                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert.");
+                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert. Abbruch zum Quota-Schutz.");
                 return;
             }
+
+            // Route bestimmen
+            let route = smartRoute(msg);
 
             chat.innerHTML += '<div class="user-line"><b>Du:</b> ' + escapeHtml(msg) + '</div>';
             msgInput.value = '';
             chat.scrollTop = chat.scrollHeight;
 
-            chat.innerHTML += '<div class="system-line" id="loading">➔ JARVIS (' + escapeHtml(selectedModel.replace('models/', '')) + ') verarbeitet...</div>';
+            chat.innerHTML += `<div class="system-line" id="loading">➔ Smart-Router wählt <b>${route.name}</b> – verarbeite...</div>`;
             chat.scrollTop = chat.scrollHeight;
 
             // System-Instruction aus GitHub laden
@@ -179,11 +148,19 @@
                 if(instructRes.ok) systemPrompt = await instructRes.text();
             } catch(e){}
 
-            // Sicherstellen, dass kein doppeltes "models/" im URL-Pfad entsteht
-            let cleanModelPath = selectedModel.startsWith("models/") ? selectedModel : "models/" + selectedModel;
+            // Zähler sofort für den Versuch belasten (damit auch Fehler getrackt werden!)
+            sessionQuota--;
+            if (route.isPro) {
+                proUsed++;
+                localStorage.setItem('jarvis_pro_used', proUsed);
+            } else {
+                flashUsed++;
+                localStorage.setItem('jarvis_flash_used', flashUsed);
+            }
+            updateDisplay();
 
             try {
-                let url = `https://generativelanguage.googleapis.com/v1beta/${cleanModelPath}:generateContent?key=${key}`;
+                let url = `https://generativelanguage.googleapis.com/v1beta/models/${route.id}:generateContent?key=${key}`;
                 
                 let response = await fetch(url, {
                     method: 'POST',
@@ -199,17 +176,10 @@
 
                 if (response.ok && data.candidates && data.candidates[0].content.parts[0].text) {
                     let reply = data.candidates[0].content.parts[0].text;
-                    chat.innerHTML += '<div class="agent-line"><b>JARVIS:</b><br>' + escapeHtml(reply) + '</div>';
-                    
-                    // Zähler updaten
-                    sessionQuota--;
-                    dailyTotal++;
-                    document.getElementById('sessionQuota').innerText = sessionQuota;
-                    document.getElementById('dailyTotal').innerText = dailyTotal;
-                    localStorage.setItem('jarvis_daily_total', dailyTotal);
+                    chat.innerHTML += '<div class="agent-line"><b>JARVIS (' + (route.isPro ? 'PRO' : 'FLASH') + '):</b><br>' + escapeHtml(reply) + '</div>';
                 } else {
                     let errMessage = data.error ? data.error.message : JSON.stringify(data);
-                    addWarnMsg("⚠️ API-Fehler (" + cleanModelPath + "): " + errMessage);
+                    addWarnMsg(`⚠️ API-Fehler (${route.id}): ` + errMessage);
                 }
             } catch (err) {
                 removeLoader();
