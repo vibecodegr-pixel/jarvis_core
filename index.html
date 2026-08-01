@@ -14,6 +14,7 @@
         .stat-val { color: #8ab4f8; font-weight: bold; }
         .stat-flash { color: #5cf28e; font-weight: bold; }
         .btn-small { padding: 6px 12px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.75rem; }
+        .btn-cloud { background: #5cf28e; }
         
         #chat { flex-grow: 1; border: 1px solid #2a2a35; padding: 15px; margin-bottom: 12px; overflow-y: auto; background: #16161f; border-radius: 10px; }
         .user-line { margin: 10px 0; color: #e4e4ed; }
@@ -28,14 +29,17 @@
     </style>
 </head>
 <body>
-    <h2>🤖 JARVIS CORE (SELF-CORRECTING AGENT)</h2>
+    <h2>🤖 JARVIS CORE (CLOUD AGENT)</h2>
     
     <div class="dashboard">
         <div class="stat-group">
             <div class="stat-item">🚀 Anfragen übrig: <span class="stat-flash" id="flashCount">1500</span>/1500</div>
             <div class="stat-item">🛡️ Session-Puffer: <span class="stat-val" id="sessionQuota">100</span></div>
         </div>
-        <button class="btn-small" onclick="releaseQuota(100)">+ 100 Puffer</button>
+        <div style="display: flex; gap: 6px;">
+            <button class="btn-small" onclick="releaseQuota(100)">+ 100 Puffer</button>
+            <button class="btn-small btn-cloud" onclick="triggerJarvisAgent()">🚀 Cloud-Agent starten</button>
+        </div>
     </div>
 
     <div class="config-box">
@@ -45,10 +49,10 @@
         <input type="text" id="ntfyTopic" placeholder="ntfy.sh Thema (z.B. jarvis-status-GR-998877)..." oninput="localStorage.setItem('jarvis_ntfy_topic', this.value.trim())">
     </div>
 
-    <div id="chat"><div class="system-line">JARVIS Core online. Selbstkorrigierender Modus aktiv (Anti-Rate-Limit-Pacing aktiv)...</div></div>
+    <div id="chat"><div class="system-line">JARVIS Core Steuerzentrale online. Cloud-Agent Steuerung bereit...</div></div>
     
     <div class="msg-box">
-        <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
+        <input type="text" id="msg" placeholder="Befehl für JARVIS (oder direkt Cloud-Agent starten)..." onkeypress="if(event.key === 'Enter') send();">
         <button class="btn-send" onclick="send()">Senden</button>
     </div>
 
@@ -111,17 +115,45 @@
             return new TextDecoder().decode(bytes);
         }
 
-        async function sendNtfyNotification(text) {
-            let topic = document.getElementById('ntfyTopic').value.trim();
-            if (!topic) return;
+        // NEU: Löst den GitHub Workflow (jarvis-agent.yml) direkt aus der Web-UI aus
+        async function triggerJarvisAgent() {
+            let ghToken = document.getElementById('ghToken').value.trim() || localStorage.getItem('jarvis_gh_token');
+            let msgInput = document.getElementById('msg');
+            let commandText = msgInput.value.trim() || 'System-Check';
+
+            if (!ghToken) {
+                alert('Bitte trage zuerst deinen GitHub Personal Access Token in das entsprechende Feld ein!');
+                return;
+            }
+
+            let repoInfo = getRepoInfo();
+            addSystemMsg(`🚀 Sende Befehl an GitHub Cloud-Agent (${repoInfo.owner}/${repoInfo.repo})...`);
+
             try {
-                await fetch(`https://ntfy.sh/${topic}`, {
+                let response = await fetch(`https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/actions/workflows/jarvis-agent.yml/dispatches`, {
                     method: 'POST',
-                    body: text,
-                    mode: 'no-cors'
+                    headers: {
+                        'Authorization': `token ${ghToken}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        ref: 'main',
+                        inputs: {
+                            command: commandText
+                        }
+                    })
                 });
-            } catch (e) {
-                console.error("Ntfy Fehler:", e);
+
+                if (response.ok) {
+                    addSystemMsg('✅ GitHub Workflow in der Cloud gestartet! Der Server verarbeitet den Befehl und sendet dir gleich eine Push-Benachrichtigung aufs Handy.');
+                    msgInput.value = '';
+                } else {
+                    let errJson = await response.json();
+                    addWarnMsg('⚠️ Fehler beim Starten des Cloud-Agenten: ' + (errJson.message || response.statusText));
+                }
+            } catch (error) {
+                addWarnMsg('⚠️ Netzwerkfehler beim Cloud-Trigger: ' + error.message);
             }
         }
 
@@ -192,23 +224,23 @@
             function_declarations: [
                 {
                     name: "githubGetFile",
-                    description: "Liest den aktuellen Inhalt und SHA einer Datei aus dem GitHub-Repository aus. Zwingend als erster Schritt auszuführen!",
+                    description: "Liest den aktuellen Inhalt und SHA einer Datei aus dem GitHub-Repository aus.",
                     parameters: {
                         type: "OBJECT",
                         properties: {
-                            path: { type: "STRING", description: "Der relative Pfad der Datei (z.B. index.html)" }
+                            path: { type: "STRING", description: "Der relative Pfad der Datei" }
                         },
                         required: ["path"]
                     }
                 },
                 {
                     name: "githubUpdateFile",
-                    description: "Aktualisiert eine Datei im GitHub-Repository mit dem finalen, validierten Code.",
+                    description: "Aktualisiert eine Datei im GitHub-Repository.",
                     parameters: {
                         type: "OBJECT",
                         properties: {
                             path: { type: "STRING", description: "Der relative Pfad der Datei" },
-                            content: { type: "STRING", description: "Der komplette neue Inhalt nach erfolgreichem Sanity-Check." },
+                            content: { type: "STRING", description: "Der komplette neue Inhalt." },
                             message: { type: "STRING", description: "Der Commit-Kommentar." }
                         },
                         required: ["path", "content", "message"]
@@ -252,7 +284,7 @@
             } catch(e){}
 
             let repoInfo = getRepoInfo();
-            systemPrompt += `\n\n[System-Kontext]\nGitHub Repository: ${repoInfo.owner}/${repoInfo.repo}\n\n[STRIKTES SICHERHEITS- & SELBSTKORREKTUR-PROTOKOLL FÜR CODE-ÄNDERUNGEN]:\n1. LESEN: Du musst IMMER als ersten Schritt 'githubGetFile' aufrufen, um den aktuellen Original-Code der Datei zu laden.\n2. SELBSTREFLEXION & SANITY-CHECK: Analysiere den gelesenen Code im Arbeitsspeicher. Vergewissere dich, dass du wesentliche UI-Strukturen (wie das Chat-Fenster, CSS-Stile, bestehende JavaScript-Funktionen wie 'send()') NIEMALS unabsichtlich löschst oder durch ein falsches Standard-Template ersetzt. Führe eine präzise Inkrementierung durch.\n3. SCHREIBEN: Erst wenn du im mentalen Check sicher bist, dass der Code absolut fehlerfrei ist und das Design bewahrt, speicherst du ihn mit 'githubUpdateFile' ab.`;
+            systemPrompt += `\n\n[System-Kontext]\nGitHub Repository: ${repoInfo.owner}/${repoInfo.repo}`;
 
             sessionQuota--;
             flashUsed++;
@@ -266,11 +298,9 @@
             try {
                 let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
                 
-                let success = false;
                 for (let step = 0; step < 5; step++) {
-                    // Erzwinge eine harte Sicherheitspause von 6 Sekunden ab dem 2. Schritt gegen Google Rate-Limits
                     if (step > 0) {
-                        addSystemMsg("⏳ Pacing-Sperre aktiv: Warte 6 Sekunden vor dem nächsten Schritt...");
+                        addSystemMsg("⏳ Pacing-Sperre aktiv: Warte 6 Sekunden...");
                         await new Promise(resolve => setTimeout(resolve, 6000));
                     }
 
@@ -294,7 +324,7 @@
                         if (match) {
                             let waitSec = parseFloat(match[1]);
                             let waitMs = Math.ceil(waitSec * 1000) + 1000;
-                            addWarnMsg(`⏳ Free-Tier Limit erreicht. Warte ${Math.ceil(waitSec)}s und versuche es automatisch erneut...`);
+                            addWarnMsg(`⏳ Free-Tier Limit erreicht. Warte ${Math.ceil(waitSec)}s...`);
                             await new Promise(resolve => setTimeout(resolve, waitMs));
                             step--;
                             continue;
@@ -318,11 +348,11 @@
                         let fnArgs = functionCallPart.functionCall.args;
 
                         if (!ghToken) {
-                            addWarnMsg("⚠️ JARVIS möchte auf GitHub zugreifen, aber es ist kein GitHub Token eingetragen!");
+                            addWarnMsg("⚠️ Kein GitHub Token eingetragen!");
                             break;
                         }
 
-                        addSystemMsg(`⚙️ JARVIS führt autonom aus: <b>${fnName}</b> (${fnArgs.path || ''})...`);
+                        addSystemMsg(`⚙️ JARVIS führt aus: <b>${fnName}</b>...`);
 
                         let toolResult = {};
                         if (fnName === "githubGetFile") {
@@ -350,7 +380,6 @@
                     if (textPart) {
                         let reply = textPart.text;
                         chat.innerHTML += `<div class="agent-line"><b>JARVIS (${modelName}):</b><br>` + escapeHtml(reply) + '</div>';
-                        success = true;
                     }
                     break;
                 }
@@ -359,7 +388,7 @@
 
             } catch (err) {
                 removeLoader();
-                addWarnMsg("⚠️ Netzwerk- oder Verbindungsfehler: " + err.message);
+                addWarnMsg("⚠️ Netzwerkfehler: " + err.message);
             }
 
             chat.scrollTop = chat.scrollHeight;
