@@ -12,6 +12,10 @@ jobs:
   run-agent:
     runs-on: ubuntu-latest
     
+    # HIER IST DIE LÖSUNG: Erlaubt JARVIS das Speichern im Repo
+    permissions:
+      contents: write
+    
     steps:
       - name: Repository auschecken
         uses: actions/checkout@v4
@@ -46,7 +50,6 @@ jobs:
 
           print(f'[Tracking] Starte HF-Inferenz für: {command}')
           
-          # 1. Gedächtnis aus memory.json laden
           memory_file = 'memory.json'
           history = []
           if os.path.exists(memory_file):
@@ -57,7 +60,6 @@ jobs:
                   print(f'[Gedächtnis] Konnte memory.json nicht lesen: {e}')
                   history = []
 
-          # Letzte 5 Einträge für den Kontext aufbereiten
           context_str = ''
           if history:
               context_str = '\n\nBisheriges Gedächtnis (letzte Aktionen):\n' + '\n'.join(
@@ -84,7 +86,6 @@ jobs:
               )
               answer = response.choices[0].message.content
 
-              # 2. Gedächtnis aktualisieren & speichern (max. 15 Einträge behalten)
               history.append({'cmd': command, 'ans': answer})
               history = history[-15:]
               with open(memory_file, 'w', encoding='utf-8') as f:
@@ -106,5 +107,5 @@ jobs:
         run: |
           git config --global user.name 'JARVIS Cloud Agent'
           git config --global user.email 'agent@jarvis.local'
-          git add .
+          git add memory.json
           git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Gedächtnis aktualisiert' && git push)
