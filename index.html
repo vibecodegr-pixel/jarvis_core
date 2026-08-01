@@ -45,7 +45,7 @@
         <input type="password" id="ghToken" placeholder="GitHub Personal Access Token eintragen..." onchange="localStorage.setItem('jarvis_gh_token', this.value.trim())">
     </div>
 
-    <div id="chat"><div class="system-line">JARVIS Core online. GitHub-Schnittstelle bereit...</div></div>
+    <div id="chat"><div class="system-line">JARVIS Core online. Autonomes GitHub-Modul integriert...</div></div>
     
     <div class="msg-box">
         <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
@@ -106,8 +106,19 @@
             return { id: "gemini-3.5-flash", name: "FLASH 3.5 (Standard/Schnell)", isPro: false };
         }
 
+        // Automatische Erkennung des GitHub-Repo Namens aus der aktuellen URL
+        function getRepoInfo() {
+            // URL-Format: https://username.github.io/reponame/ oder ähnlich
+            let host = window.location.hostname; // z.B. ecodegr-pixel.github.io
+            let owner = host.split('.')[0];
+            let pathSegments = window.location.pathname.split('/').filter(Boolean);
+            let repo = pathSegments.length > 0 ? pathSegments[0] : 'jarvis_core'; // Fallback
+            return { owner, repo };
+        }
+
         async function send() {
             let key = document.getElementById('apiKey').value.trim();
+            let ghToken = document.getElementById('ghToken').value.trim();
             let msgInput = document.getElementById('msg');
             let msg = msgInput.value.trim();
             let chat = document.getElementById('chat');
@@ -134,11 +145,18 @@
             chat.innerHTML += `<div class="system-line" id="loading">➔ Smart-Router wählt <b>${route.name}</b> – verarbeite...</div>`;
             chat.scrollTop = chat.scrollHeight;
 
+            // System-Instruction aus GitHub laden + Repo-Status übergeben
             let systemPrompt = "Du bist JARVIS, ein autonomer Assistent.";
             try {
                 let instructRes = await fetch("instructions.md?t=" + new Date().getTime());
-                if(instructRes.ok) systemPrompt = await instructRes.text();
+                if(instructRes.ok) {
+                    systemPrompt = await instructRes.text();
+                }
             } catch(e){}
+
+            // Dem Systemprompt das aktuelle Repository mitteilen, falls er Dateien schreiben soll
+            let repoInfo = getRepoInfo();
+            systemPrompt += `\n\n[System-Kontext]\nGitHub Repository: ${repoInfo.owner}/${repoInfo.repo}\nDer Nutzer hat einen GitHub Token hinterlegt. Du kannst ihm Code-Snippets oder Dateiinhalte nennen, die er committen kann, oder (falls implementiert) direkt via API aktualisieren.`;
 
             sessionQuota--;
             if (route.isPro) {
