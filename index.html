@@ -12,11 +12,11 @@
         .btn-small { padding: 6px 12px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; }
         .btn-cloud { background: #5cf28e; }
         
-        #chat { flex-grow: 1; border: 1px solid #2a2a35; padding: 15px; margin-bottom: 12px; overflow-y: auto; background: #16161f; border-radius: 10px; }
-        .user-line { margin: 10px 0; color: #e4e4ed; }
-        .system-line { margin: 10px 0; color: #8ab4f8; font-style: italic; font-size: 0.85rem; }
-        .warn-line { margin: 10px 0; color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; word-break: break-all; font-size: 0.85rem; }
-        .agent-line { margin: 10px 0; color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #5cf28e; white-space: pre-wrap; line-height: 1.4; font-size: 0.95rem; }
+        #chat { flex-grow: 1; border: 1px solid #2a2a35; padding: 15px; margin-bottom: 12px; overflow-y: auto; background: #16161f; border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
+        .user-line { color: #e4e4ed; background: #22222e; padding: 10px; border-radius: 8px; align-self: flex-end; max-width: 85%; word-break: break-word; }
+        .system-line { color: #8ab4f8; font-style: italic; font-size: 0.85rem; text-align: center; }
+        .warn-line { color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; word-break: break-all; font-size: 0.85rem; }
+        .agent-line { color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #5cf28e; white-space: pre-wrap; line-height: 1.4; font-size: 0.95rem; width: 100%; box-sizing: border-box; }
         
         .config-box { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
         input[type="password"], input[type="text"] { width: 100%; padding: 12px; background: #22222e; color: #fff; border: 1px solid #3a3a4c; border-radius: 8px; outline: none; box-sizing: border-box; font-size: 0.9rem; }
@@ -40,7 +40,7 @@
         <input type="text" id="ntfyTopic" placeholder="ntfy.sh Thema (z.B. jarvis-status-GR-998877)..." oninput="localStorage.setItem('jarvis_ntfy_topic', this.value.trim())">
     </div>
 
-    <div id="chat"><div class="system-line">Steuerzentrale bereit. Befehl eingeben und absenden...</div></div>
+    <div id="chat"><div class="system-line">Steuerzentrale bereit.</div></div>
     
     <div class="msg-box">
         <input type="text" id="msg" placeholder="Befehl für JARVIS..." onkeypress="if(event.key === 'Enter') triggerJarvisAgent();">
@@ -50,6 +50,12 @@
     <script>
         document.getElementById('ghToken').value = localStorage.getItem('jarvis_gh_token') || '';
         document.getElementById('ntfyTopic').value = localStorage.getItem('jarvis_ntfy_topic') || '';
+
+        // Beim Start: Lokalen Chat-Verlauf laden und mit GitHub synchronisieren
+        window.onload = async function() {
+            loadLocalChat();
+            await syncWithGitHubMemory();
+        };
 
         function getRepoInfo() {
             let host = window.location.hostname;
@@ -64,7 +70,63 @@
             let repoInfo = getRepoInfo();
             let zipUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}/archive/refs/heads/main.zip`;
             window.open(zipUrl, '_blank');
-            addSystemMsg("📦 Full-Repo ZIP-Download gestartet.");
+            appendMessage('system', '📦 Full-Repo ZIP-Download gestartet.');
+        }
+
+        async function syncWithGitHubMemory() {
+            let repoInfo = getRepoInfo();
+            try {
+                let res = await fetch(`https://raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/memory.json?t=` + Date.now());
+                if (res.ok) {
+                    let history = await res.json();
+                    let chat = document.getElementById('chat');
+                    // Wenn der Chat leer ist oder nur die Willkommensnachricht hat, füllen wir mit memory.json auf
+                    if (history && history.length > 0) {
+                        chat.innerHTML = '<div class="system-line">Verlauf mit Cloud synchronisiert.</div>';
+                        history.forEach(item => {
+                            appendMessage('user', item.cmd, false);
+                            appendMessage('agent', item.ans, false);
+                        });
+                    }
+                }
+            } catch (e) {
+                // Stumm bleiben, falls Offline oder Token fehlt
+            }
+        }
+
+        function loadLocalChat() {
+            let savedChat = localStorage.getItem('jarvis_chat_history');
+            if (savedChat) {
+                document.getElementById('chat').innerHTML = savedChat;
+            }
+        }
+
+        function saveLocalChat() {
+            let chatHTML = document.getElementById('chat').innerHTML;
+            localStorage.setItem('jarvis_chat_history', chatHTML);
+        }
+
+        function appendMessage(type, text, save = true) {
+            let chat = document.getElementById('chat');
+            let div = document.createElement('div');
+            
+            if (type === 'user') {
+                div.className = 'user-line';
+                div.innerHTML = '<b>Du:</b> ' + escapeHtml(text);
+            } else if (type === 'agent') {
+                div.className = 'agent-line';
+                div.innerHTML = '<b>JARVIS:</b><br>' + escapeHtml(text);
+            } else if (type === 'system') {
+                div.className = 'system-line';
+                div.innerHTML = text;
+            } else if (type === 'warn') {
+                div.className = 'warn-line';
+                div.innerHTML = text;
+            }
+
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+            if (save) saveLocalChat();
         }
 
         async function triggerJarvisAgent() {
@@ -80,12 +142,10 @@
 
             let repoInfo = getRepoInfo();
             
-            let chat = document.getElementById('chat');
-            chat.innerHTML += '<div class="user-line"><b>Du:</b> ' + escapeHtml(commandText) + '</div>';
+            appendMessage('user', commandText);
             msgInput.value = '';
-            chat.scrollTop = chat.scrollHeight;
 
-            addSystemMsg(`🚀 Sende Befehl an GitHub Cloud-Agent (${repoInfo.owner}/${repoInfo.repo})...`);
+            appendMessage('system', 'Läuft. Der Agent schraubt im Hintergrund daran – gleich klingelt das Handy mit dem Update.');
 
             try {
                 let response = await fetch(`https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/actions/workflows/jarvis-agent.yml/dispatches`, {
@@ -103,34 +163,13 @@
                     })
                 });
 
-                if (response.ok) {
-                    addAgentMsg("✅ Befehl erfolgreich an die Cloud übergeben! Der GitHub-Agent verarbeitet ihn im Hintergrund[span_1](start_span)[span_1](end_span). Du erhältst gleich deine Push-Benachrichtigung aufs Handy, sobald alles live ist.");
-                } else {
+                if (!response.ok) {
                     let errJson = await response.json();
-                    addWarnMsg('⚠️ Fehler beim Starten: ' + (errJson.message || response.statusText));
+                    appendMessage('warn', '⚠️ Fehler beim Starten: ' + (errJson.message || response.statusText));
                 }
             } catch (error) {
-                addWarnMsg('⚠️ Netzwerkfehler: ' + error.message);
+                appendMessage('warn', '⚠️ Netzwerkfehler: ' + error.message);
             }
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function addSystemMsg(text) {
-            let chat = document.getElementById('chat');
-            chat.innerHTML += '<div class="system-line">' + text + '</div>';
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function addAgentMsg(text) {
-            let chat = document.getElementById('chat');
-            chat.innerHTML += '<div class="agent-line">' + text + '</div>';
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function addWarnMsg(text) {
-            let chat = document.getElementById('chat');
-            chat.innerHTML += '<div class="warn-line">' + text + '</div>';
-            chat.scrollTop = chat.scrollHeight;
         }
 
         function escapeHtml(text) {
