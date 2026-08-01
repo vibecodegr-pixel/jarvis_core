@@ -1,5 +1,10 @@
 name: JARVIS Cloud Agent (HF API & Dynamic)
 
+# 1. WARTESCHLANGE: Verhindert Kollisionen bei schnellen Befehlen hintereinander
+concurrency:
+  group: jarvis-memory-lock
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +17,6 @@ jobs:
   run-agent:
     runs-on: ubuntu-latest
     
-    # HIER IST DIE LÖSUNG: Erlaubt JARVIS das Speichern im Repo
     permissions:
       contents: write
     
@@ -33,7 +37,6 @@ jobs:
       - name: JARVIS über Hugging Face API ausführen
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           USER_COMMAND: ${{ github.event.inputs.command }}
         run: |
           python -c "
@@ -41,12 +44,10 @@ jobs:
           import time
           import json
           from huggingface_hub import InferenceClient
-          import requests
 
           start_time = time.time()
           token = os.environ.get('HF_TOKEN')
           command = os.environ.get('USER_COMMAND', 'System-Check')
-          topic = os.environ.get('NTFY_TOPIC', 'jarvis-status-GR-998877')
 
           print(f'[Tracking] Starte HF-Inferenz für: {command}')
           
@@ -99,13 +100,23 @@ jobs:
           duration = round(time.time() - start_time, 2)
           print(f'[Tracking] Beendet. Status: {status} | Dauer: {duration}s')
 
+          # 2. NACHRICHT ZWISCHENSPEICHERN (ausserhalb des Repos in /tmp/)
           notif_text = f'🤖 JARVIS [{status}] ({duration}s)\nBefehl: {command}\nAntwort: {answer[:150]}...'
-          requests.post(f'https://ntfy.sh/{topic}', data=notif_text.encode('utf-8'))
+          with open('/tmp/jarvis_notif.txt', 'w', encoding='utf-8') as f:
+              f.write(notif_text)
           "
 
       - name: Änderungen committen & pushen
         run: |
           git config --global user.name 'JARVIS Cloud Agent'
           git config --global user.email 'agent@jarvis.local'
-          git add memory.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Gedächtnis aktualisiert' && git push)
+          git add .
+          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Gedächtnis/Dateien aktualisiert' && git push)
+
+      # 3. BENACHRICHTIGUNG SENDEN: Läuft erst, wenn git push zu 100 % durch ist
+      - name: Benachrichtigung senden (nach Git-Push)
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          TOPIC="${NTFY_TOPIC:-jarvis-status-GR-998877}"
+          curl -s -X POST "https://ntfy.sh/$TOPIC" --data-binary "@/tmp/jarvis_notif.txt"
