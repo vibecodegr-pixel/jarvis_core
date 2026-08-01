@@ -50,12 +50,12 @@ jobs:
 
           try:
               client = InferenceClient(token=token)
-              response = client.chat.completions.create(
+              # Nutzen von text_generation, um Formatfehler der Serverless-API zu umgehen
+              answer = client.text_generation(
                   model='NousResearch/Hermes-3-Llama-3.1-8B-Instruct',
-                  messages=[{'role': 'user', 'content': f'Du bist JARVIS, ein autonomer Software-Agent. Führe folgenden Befehl aus und antworte präzise: {command}'}],
-                  max_tokens=400
+                  prompt=f'Du bist JARVIS, ein autonomer Software-Agent. Führe folgenden Befehl aus und antworte präzise: {command}',
+                  max_new_tokens=400
               )
-              answer = response.choices[0].message.content
 
           except Exception as e:
               status = 'FEHLER'
