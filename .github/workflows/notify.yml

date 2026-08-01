@@ -1,12 +1,12 @@
-name: Send Push on Complete
+name: Notify on Deployment Success
 
 on:
-  push:
-    branches: [ main ]
+  deployment_status:
 
 jobs:
   notify:
     runs-on: ubuntu-latest
+    if: github.event.deployment_status.state == 'success'
     steps:
       - name: Send ntfy Push Notification
         run: |
