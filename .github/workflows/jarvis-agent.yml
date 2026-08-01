@@ -1,6 +1,5 @@
 name: JARVIS Cloud Agent (HF API & Dynamic)
 
-# 1. WARTESCHLANGE: Verhindert Kollisionen bei schnellen Befehlen hintereinander
 concurrency:
   group: jarvis-memory-lock
   cancel-in-progress: false
@@ -51,14 +50,26 @@ jobs:
 
           print(f'[Tracking] Starte HF-Inferenz für: {command}')
           
+          # 1. Quota laden & prüfen
+          quota_file = 'quota.json'
+          quota_data = {'cloud_runs': 0, 'total_tokens': 0}
+          if os.path.exists(quota_file):
+              try:
+                  with open(quota_file, 'r', encoding='utf-8') as f:
+                      quota_data = json.load(f)
+              except:
+                  pass
+
+          quota_data['cloud_runs'] = quota_data.get('cloud_runs', 0) + 1
+
+          # 2. Gedächtnis laden
           memory_file = 'memory.json'
           history = []
           if os.path.exists(memory_file):
               try:
                   with open(memory_file, 'r', encoding='utf-8') as f:
                       history = json.load(f)
-              except Exception as e:
-                  print(f'[Gedächtnis] Konnte memory.json nicht lesen: {e}')
+              except:
                   history = []
 
           context_str = ''
@@ -87,10 +98,19 @@ jobs:
               )
               answer = response.choices[0].message.content
 
+              # Token-Verbrauch grob schätzen und addieren
+              used_tokens = len(command.split()) + len(answer.split())
+              quota_data['total_tokens'] = quota_data.get('total_tokens', 0) + used_tokens
+
+              # Gedächtnis aktualisieren
               history.append({'cmd': command, 'ans': answer})
               history = history[-15:]
               with open(memory_file, 'w', encoding='utf-8') as f:
                   json.dump(history, f, ensure_ascii=False, indent=2)
+
+              # Quota aktualisieren
+              with open(quota_file, 'w', encoding='utf-8') as f:
+                  json.dump(quota_data, f, ensure_ascii=False, indent=2)
 
           except Exception as e:
               status = 'FEHLER'
@@ -100,8 +120,8 @@ jobs:
           duration = round(time.time() - start_time, 2)
           print(f'[Tracking] Beendet. Status: {status} | Dauer: {duration}s')
 
-          # 2. NACHRICHT ZWISCHENSPEICHERN (ausserhalb des Repos in /tmp/)
-          notif_text = f'🤖 JARVIS [{status}] ({duration}s)\nBefehl: {command}\nAntwort: {answer[:150]}...'
+          # Nachricht für Handy vorbereiten (inkl. Quota-Info)
+          notif_text = f'🤖 JARVIS [{status}] ({duration}s)\nBefehl: {command}\nAntwort: {answer[:150]}...\n📊 Cloud-Lauf #{quota_data[\"cloud_runs\"]}'
           with open('/tmp/jarvis_notif.txt', 'w', encoding='utf-8') as f:
               f.write(notif_text)
           "
@@ -110,10 +130,9 @@ jobs:
         run: |
           git config --global user.name 'JARVIS Cloud Agent'
           git config --global user.email 'agent@jarvis.local'
-          git add .
-          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Gedächtnis/Dateien aktualisiert' && git push)
+          git add memory.json quota.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Gedächtnis & Quota aktualisiert' && git push)
 
-      # 3. BENACHRICHTIGUNG SENDEN: Läuft erst, wenn git push zu 100 % durch ist
       - name: Benachrichtigung senden (nach Git-Push)
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
