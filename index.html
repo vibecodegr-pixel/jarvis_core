@@ -54,7 +54,6 @@
     <script>
         document.getElementById('apiKey').value = localStorage.getItem('jarvis_gemini_key') || '';
         
-        // --- QUOTA & AUTOMATISCHER MITTERNACHTS-RESET ---
         let todayStr = new Date().toISOString().slice(0, 10);
         let savedDate = localStorage.getItem('jarvis_date');
         
@@ -92,26 +91,20 @@
             return duplicates.length >= 2;
         }
 
-        // --- INTELLIGENTER SMART-ROUTER (KOMPLEXITÄTS-ANALYSE) ---
+        // Smart-Router auf die echten, freigeschalteten Account-Modelle umgestellt
         function smartRoute(text) {
-            // 1. Erkennt Code-Syntax (Klammern, Zuweisungen, HTML/JS)
             const hasCodeSyntax = /[{};=<>]/g.test(text) && text.length > 25;
-            
-            // 2. Erkennt Problemlösungs-, Bau- und Analyse-Wörter
             const techTerms = ['code', 'fehler', 'bug', 'script', 'html', 'css', 'js', 'javascript', 'python', 'json', 'github', 'fix', 'funktioniert nicht', 'wieso', 'warum', 'schleife', 'api', 'repository', 'commit', 'anleitung', 'erkläre', 'optimier', 'schreibe', 'bau', 'system', 'problem'];
             const lower = text.toLowerCase();
             const hasTechTerm = techTerms.some(term => lower.includes(term));
-            
-            // 3. Längere und komplexere Anfragen
             const isLong = text.length > 130;
 
             if (hasCodeSyntax || hasTechTerm || isLong) {
-                return { id: "gemini-2.5-pro", name: "PRO 2.5 (Komplex/Code)", isPro: true };
+                return { id: "gemini-3.1-pro-preview", name: "PRO 3.1 (Komplex/Code)", isPro: true };
             }
-            return { id: "gemini-2.5-flash", name: "FLASH 2.5 (Standard/Schnell)", isPro: false };
+            return { id: "gemini-3.5-flash", name: "FLASH 3.5 (Standard/Schnell)", isPro: false };
         }
 
-        // --- BEFEHL SENDEN ---
         async function send() {
             let key = document.getElementById('apiKey').value.trim();
             let msgInput = document.getElementById('msg');
@@ -127,11 +120,10 @@
             }
 
             if(detectLoop(msg)) {
-                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert. Abbruch zum Quota-Schutz.");
+                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert.");
                 return;
             }
 
-            // Route bestimmen
             let route = smartRoute(msg);
 
             chat.innerHTML += '<div class="user-line"><b>Du:</b> ' + escapeHtml(msg) + '</div>';
@@ -141,14 +133,12 @@
             chat.innerHTML += `<div class="system-line" id="loading">➔ Smart-Router wählt <b>${route.name}</b> – verarbeite...</div>`;
             chat.scrollTop = chat.scrollHeight;
 
-            // System-Instruction aus GitHub laden
             let systemPrompt = "Du bist JARVIS, ein autonomer Assistent.";
             try {
                 let instructRes = await fetch("instructions.md?t=" + new Date().getTime());
                 if(instructRes.ok) systemPrompt = await instructRes.text();
             } catch(e){}
 
-            // Zähler sofort für den Versuch belasten (damit auch Fehler getrackt werden!)
             sessionQuota--;
             if (route.isPro) {
                 proUsed++;
