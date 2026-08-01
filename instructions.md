@@ -23,3 +23,4 @@
 
 ## 5. Test-Einträge
 - [x] test123
+- [x] Test-Eintrag: Autonomer Loop funktioniert einwandfrei
