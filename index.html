@@ -101,9 +101,9 @@
                 if(instructRes.ok) systemPrompt = await instructRes.text();
             } catch(e){}
 
-            // Direkter, sauberer API-Aufruf an das offizielle gemini-1.5-flash Modell
+            // Stabiler, aktueller Endpunkt für Google AI Studio Free-Tier Keys
             try {
-                let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+                let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${key}`;
                 
                 let response = await fetch(url, {
                     method: 'POST',
@@ -127,7 +127,6 @@
                     document.getElementById('dailyTotal').innerText = dailyTotal;
                     localStorage.setItem('jarvis_daily_total', dailyTotal);
                 } else {
-                    // Falls Google einen Fehler meldet, zeigen wir ihn exakt an
                     let errMessage = data.error ? data.error.message : JSON.stringify(data);
                     addWarnMsg("⚠️ API-Fehler von Google: " + errMessage);
                 }
