@@ -3,303 +3,303 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS Core - Autonomous Control Center</title>
+    <title>JARVIS Core Control Panel</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f12; color: #e4e4ed; padding: 15px; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-between; box-sizing: border-box; }
-        h2 { color: #8ab4f8; text-align: center; margin: 0 0 10px 0; font-size: 1.3rem; }
-        
-        .dashboard { background: #181824; border: 1px solid #2a2a38; border-radius: 10px; padding: 10px 15px; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; }
-        .stat-group { display: flex; gap: 15px; flex-wrap: wrap; }
-        .stat-item { color: #aaa; }
-        .stat-val { color: #8ab4f8; font-weight: bold; }
-        .stat-flash { color: #5cf28e; font-weight: bold; }
-        .btn-small { padding: 6px 12px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.75rem; }
-        
-        #chat { flex-grow: 1; border: 1px solid #2a2a35; padding: 15px; margin-bottom: 12px; overflow-y: auto; background: #16161f; border-radius: 10px; }
-        .user-line { margin: 10px 0; color: #e4e4ed; }
-        .system-line { margin: 10px 0; color: #8ab4f8; font-style: italic; font-size: 0.85rem; }
-        .warn-line { margin: 10px 0; color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; word-break: break-all; font-size: 0.85rem; }
-        .agent-line { margin: 10px 0; color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #8ab4f8; white-space: pre-wrap; line-height: 1.4; font-size: 0.95rem; }
-        
-        .config-box { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
-        input[type="password"], input[type="text"] { width: 100%; padding: 12px; background: #22222e; color: #fff; border: 1px solid #3a3a4c; border-radius: 8px; outline: none; box-sizing: border-box; font-size: 0.9rem; }
-        .msg-box { display: flex; gap: 8px; width: 100%; }
-        .btn-send { padding: 12px 20px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+        :root {
+            --bg-color: #0a0e17;
+            --panel-bg: #121824;
+            --border-color: #1f2d44;
+            --accent-cyan: #00e5ff;
+            --accent-blue: #0088ff;
+            --text-color: #e2e8f0;
+            --text-muted: #64748b;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: var(--accent-cyan);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+        }
+
+        .status-badge {
+            background-color: rgba(0, 229, 255, 0.1);
+            border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .config-box {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .config-title {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+            color: var(--accent-blue);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        input, textarea, button {
+            background-color: #070a10;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        input:focus, textarea:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 8px rgba(0, 229, 255, 0.2);
+        }
+
+        button {
+            cursor: pointer;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--accent-blue), #5000ff);
+            border: none;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .editor-box {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        textarea {
+            font-family: 'Consolas', 'Fira Code', monospace;
+            min-height: 300px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--text-color);
+            color: var(--text-color);
+            background: rgba(255, 255, 255, 0.05);
+        }
     </style>
 </head>
 <body>
-    <h2>🤖 JARVIS CORE (GEMINI 3.5 FLASH)</h2>
-    
-    <div class="dashboard">
-        <div class="stat-group">
-            <div class="stat-item">🚀 Anfragen übrig: <span class="stat-flash" id="flashCount">1500</span>/1500</div>
-            <div class="stat-item">🛡️ Session-Puffer: <span class="stat-val" id="sessionQuota">100</span></div>
-        </div>
-        <button class="btn-small" onclick="releaseQuota(100)">+ 100 Puffer</button>
-    </div>
+    <div class="container">
+        <header>
+            <h1>JARVIS // Core Control</h1>
+            <div class="status-badge">SYSTEM ACTIVE</div>
+        </header>
 
-    <div class="config-box">
-        <input type="password" id="apiKey" placeholder="Gemini API-Key eintragen..." oninput="localStorage.setItem('jarvis_gemini_key', this.value.trim())">
-        <input type="password" id="ghToken" placeholder="GitHub Personal Access Token eintragen..." oninput="localStorage.setItem('jarvis_gh_token', this.value.trim())">
-        <input type="text" id="modelName" placeholder="Modell-ID..." value="gemini-3.5-flash" oninput="localStorage.setItem('jarvis_model_name', this.value.trim())">
-    </div>
+        <section class="config-box">
+            <h3 class="config-title">System Konfiguration</h3>
+            <div class="grid-2">
+                <input type="password" id="githubToken" placeholder="GitHub Personal Access Token..." oninput="localStorage.setItem('jarvis_github_token', this.value.trim())">
+                <input type="text" id="githubRepo" placeholder="GitHub Repository (z.B. user/repo)..." oninput="localStorage.setItem('jarvis_github_repo', this.value.trim())">
+            </div>
+            <div class="grid-2">
+                <input type="text" id="filePath" placeholder="Dateipfad (z.B. instructions.md)..." oninput="localStorage.setItem('jarvis_file_path', this.value.trim())">
+                <input type="text" id="ntfyTopic" placeholder="ntfy.sh Thema (z.B. jarvis-status-GR-998877)..." oninput="localStorage.setItem('jarvis_ntfy_topic', this.value.trim())">
+            </div>
+        </section>
 
-    <div id="chat"><div class="system-line">JARVIS Core online. Gemini 3.5 Flash aktiv...</div></div>
-    
-    <div class="msg-box">
-        <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
-        <button class="btn-send" onclick="send()">Senden</button>
+        <main class="editor-box">
+            <h3 class="config-title">File Editor</h3>
+            <textarea id="fileContent" placeholder="Lade eine Datei oder schreibe hier Code/Inhalt hinein..."></textarea>
+            <div class="button-group">
+                <button onclick="loadFile()" class="btn-secondary" style="flex: 1;">Datei Laden</button>
+                <button onclick="saveFile()" style="flex: 2;">Datei Speichern (Commit)</button>
+            </div>
+        </main>
     </div>
 
     <script>
-        document.getElementById('apiKey').value = localStorage.getItem('jarvis_gemini_key') || '';
-        document.getElementById('ghToken').value = localStorage.getItem('jarvis_gh_token') || '';
-        document.getElementById('modelName').value = localStorage.getItem('jarvis_model_name') || 'gemini-3.5-flash';
-        
-        let todayStr = new Date().toISOString().slice(0, 10);
-        let savedDate = localStorage.getItem('jarvis_date');
-        
-        if (savedDate !== todayStr) {
-            localStorage.setItem('jarvis_date', todayStr);
-            localStorage.setItem('jarvis_flash_used', '0');
-        }
+        // Initialisierung beim Laden
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('githubToken').value = localStorage.getItem('jarvis_github_token') || '';
+            document.getElementById('githubRepo').value = localStorage.getItem('jarvis_github_repo') || '';
+            document.getElementById('filePath').value = localStorage.getItem('jarvis_file_path') || 'instructions.md';
+            document.getElementById('ntfyTopic').value = localStorage.getItem('jarvis_ntfy_topic') || '';
+        });
 
-        let flashUsed = parseInt(localStorage.getItem('jarvis_flash_used') || '0');
-        let sessionQuota = 100;
-        let lastRequests = [];
-
-        function updateDisplay() {
-            let flashLeft = Math.max(0, 1500 - flashUsed);
-            document.getElementById('flashCount').innerText = flashLeft;
-            document.getElementById('sessionQuota').innerText = sessionQuota;
-        }
-        updateDisplay();
-
-        function releaseQuota(amount) {
-            sessionQuota += amount;
-            updateDisplay();
-            addSystemMsg(`✅ Session-Puffer um +${amount} erhöht. (Verfügbar: ${sessionQuota})`);
-        }
-
-        function detectLoop(promptText) {
-            let now = Date.now();
-            lastRequests = lastRequests.filter(r => (now - r.time) < 30000);
-            let duplicates = lastRequests.filter(r => r.prompt === promptText);
-            lastRequests.push({ prompt: promptText, time: now });
-            return duplicates.length >= 2;
-        }
-
-        function getRepoInfo() {
-            let host = window.location.hostname;
-            let owner = host.split('.')[0];
-            let pathSegments = window.location.pathname.split('/').filter(Boolean);
-            let repo = pathSegments.length > 0 ? pathSegments[0] : 'jarvis_core';
-            return { owner, repo };
-        }
-
-        function utf8ToBase64(str) {
-            return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
-                return String.fromCharCode('0x' + p1);
-            }));
-        }
-
-        async function githubUpdateFile(path, content, message, token) {
-            let repoInfo = getRepoInfo();
-            let url = `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/contents/${path}`;
-            let headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "vnd.github.v3+json",
-                "Content-Type": "application/json"
-            };
-
+        // Ntfy Push-Benachrichtigung senden
+        async function sendNtfyNotification(text) {
+            let topic = document.getElementById('ntfyTopic').value.trim();
+            if (!topic) return;
             try {
-                let getRes = await fetch(url, { headers });
-                let sha = null;
-                if (getRes.ok) {
-                    let fileData = await getRes.json();
-                    sha = fileData.sha;
+                await fetch(`https://ntfy.sh/${topic}`, { method: 'POST', body: text, mode: 'no-cors' });
+            } catch (e) { 
+                console.error("Ntfy Fehler:", e); 
+            }
+        }
+
+        // Hilfsfunktion zum Abrufen des SHAs der Datei auf GitHub
+        async function getFileSha(repo, path, token) {
+            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+            try {
+                const res = await fetch(url, {
+                    headers: { "Authorization": `token ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.sha;
                 }
+            } catch (e) {
+                console.error("Fehler beim Abrufen der SHA:", e);
+            }
+            return null;
+        }
 
-                let body = {
-                    message: message,
-                    content: utf8ToBase64(content)
+        // Datei von GitHub laden
+        async function loadFile() {
+            const token = document.getElementById('githubToken').value.trim();
+            const repo = document.getElementById('githubRepo').value.trim();
+            const path = document.getElementById('filePath').value.trim();
+
+            if (!token || !repo || !path) {
+                alert("Bitte Token, Repository und Dateipfad ausfüllen!");
+                return;
+            }
+
+            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+            try {
+                const res = await fetch(url, {
+                    headers: { "Authorization": `token ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    // Base64 decodieren (berücksichtigt UTF-8 Zeichen)
+                    const content = decodeURIComponent(escape(atob(data.content)));
+                    document.getElementById('fileContent').value = content;
+                    alert("Datei erfolgreich geladen!");
+                } else {
+                    const err = await res.json();
+                    alert("Fehler beim Laden: " + err.message);
+                }
+            } catch (e) {
+                alert("Fehler beim Laden: " + e.message);
+            }
+        }
+
+        // Datei auf GitHub speichern (githubUpdateFile)
+        async function saveFile() {
+            const token = document.getElementById('githubToken').value.trim();
+            const repo = document.getElementById('githubRepo').value.trim();
+            const path = document.getElementById('filePath').value.trim();
+            const content = document.getElementById('fileContent').value;
+
+            if (!token || !repo || !path) {
+                alert("Bitte Token, Repository und Dateipfad ausfüllen!");
+                return;
+            }
+
+            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+            
+            try {
+                const sha = await getFileSha(repo, path, token);
+                const body = {
+                    message: `chore: update ${path} via JARVIS Dashboard`,
+                    content: btoa(unescape(encodeURIComponent(content))),
+                    sha: sha || undefined
                 };
-                if (sha) body.sha = sha;
 
-                let putRes = await fetch(url, {
+                const putRes = await fetch(url, {
                     method: 'PUT',
-                    headers: headers,
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify(body)
                 });
 
                 if (putRes.ok) {
-                    return { status: "success", message: `Datei ${path} erfolgreich auf GitHub aktualisiert.` };
+                    alert("Datei erfolgreich auf GitHub gespeichert!");
+                    await sendNtfyNotification(`🚀 JARVIS Update erfolgreich: ${path}`);
                 } else {
-                    let errJson = await putRes.json();
-                    return { status: "error", message: errJson.message || "Unbekannter GitHub API Fehler" };
+                    const err = await putRes.json();
+                    alert("Speichern fehlgeschlagen: " + err.message);
                 }
-            } catch (err) {
-                return { status: "error", message: err.message };
+            } catch (e) {
+                alert("Netzwerkfehler beim Speichern: " + e.message);
             }
-        }
-
-        const githubToolsDefinition = [{
-            function_declarations: [{
-                name: "githubUpdateFile",
-                description: "Erstellt oder aktualisiert eine Datei im GitHub-Repository (z.B. instructions.md oder Code-Dateien).",
-                parameters: {
-                    type: "OBJECT",
-                    properties: {
-                        path: { type: "STRING", description: "Der relative Pfad der Datei im Repository (z.B. instructions.md)" },
-                        content: { type: "STRING", description: "Der komplette neue Inhalt der Datei." },
-                        message: { type: "STRING", description: "Der Commit-Kommentar (z.B. 'chore: update instructions.md')." }
-                    },
-                    required: ["path", "content", "message"]
-                }
-            }]
-        }];
-
-        async function send() {
-            let key = document.getElementById('apiKey').value.trim();
-            let ghToken = document.getElementById('ghToken').value.trim();
-            let modelName = document.getElementById('modelName').value.trim() || 'gemini-3.5-flash';
-            let msgInput = document.getElementById('msg');
-            let msg = msgInput.value.trim();
-            let chat = document.getElementById('chat');
-
-            if(!key) { alert('Bitte trage zuerst deinen Gemini API-Key ein!'); return; }
-            if(!msg) return;
-
-            if(sessionQuota <= 0) {
-                addWarnMsg("⚠️ Session-Puffer leer! Klicke oben auf '+ 100 Puffer'.");
-                return;
-            }
-
-            if(detectLoop(msg)) {
-                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert.");
-                return;
-            }
-
-            chat.innerHTML += '<div class="user-line"><b>Du:</b> ' + escapeHtml(msg) + '</div>';
-            msgInput.value = '';
-            chat.scrollTop = chat.scrollHeight;
-
-            chat.innerHTML += `<div class="system-line" id="loading">➔ Verarbeite mit ${modelName}...</div>`;
-            chat.scrollTop = chat.scrollHeight;
-
-            let systemPrompt = "Du bist JARVIS, ein autonomer Agent.";
-            try {
-                let instructRes = await fetch("instructions.md?t=" + new Date().getTime());
-                if(instructRes.ok) systemPrompt = await instructRes.text();
-            } catch(e){}
-
-            let repoInfo = getRepoInfo();
-            systemPrompt += `\n\n[System-Kontext]\nGitHub Repository: ${repoInfo.owner}/${repoInfo.repo}\nDu hast das Werkzeug 'githubUpdateFile' zur Verfügung, um Dateien direkt im Repository zu ändern. Nutze es aktiv, wenn der Nutzer Code oder Dokumentationen anpasst.`;
-
-            sessionQuota--;
-            flashUsed++;
-            localStorage.setItem('jarvis_flash_used', flashUsed);
-            updateDisplay();
-
-            try {
-                let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
-                
-                let requestBody = {
-                    system_instruction: { parts: [{ text: systemPrompt }] },
-                    contents: [{ parts: [{ text: msg }] }],
-                    tools: githubToolsDefinition
-                };
-
-                let response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
-                });
-
-                let data = await response.json();
-                removeLoader();
-
-                if (response.ok && data.candidates && data.candidates[0].content.parts) {
-                    let parts = data.candidates[0].content.parts;
-                    let part = parts[0];
-
-                    if (part.functionCall) {
-                        let fnName = part.functionCall.name;
-                        let fnArgs = part.functionCall.args;
-
-                        if (!ghToken) {
-                            addWarnMsg("⚠️ JARVIS möchte eine Datei auf GitHub ändern, aber es ist kein GitHub Token eingetragen!");
-                            return;
-                        }
-
-                        addSystemMsg(`⚙️ JARVIS führt autonom aus: <b>${fnName}</b> (${fnArgs.path})...`);
-
-                        let toolResult = { status: "error", message: "Unknown tool" };
-                        if (fnName === "githubUpdateFile") {
-                            toolResult = await githubUpdateFile(fnArgs.path, fnArgs.content, fnArgs.message, ghToken);
-                        }
-
-                        let followUpBody = {
-                            system_instruction: { parts: [{ text: systemPrompt }] },
-                            contents: [
-                                { role: "user", parts: [{ text: msg }] },
-                                { role: "model", parts: [part] },
-                                { role: "function", parts: [{ functionResponse: { name: fnName, response: toolResult } }] }
-                            ],
-                            tools: githubToolsDefinition
-                        };
-
-                        let followUpRes = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(followUpBody)
-                        });
-
-                        let followUpData = await followUpRes.json();
-                        if (followUpRes.ok && followUpData.candidates && followUpData.candidates[0].content.parts[0].text) {
-                            let finalReply = followUpData.candidates[0].content.parts[0].text;
-                            chat.innerHTML += `<div class="agent-line"><b>JARVIS (${modelName}):</b><br>` + escapeHtml(finalReply) + '</div>';
-                        } else {
-                            addSystemMsg(`✅ Tool ausgeführt (${toolResult.status}): ${toolResult.message}`);
-                        }
-
-                    } else if (part.text) {
-                        let reply = part.text;
-                        chat.innerHTML += `<div class="agent-line"><b>JARVIS (${modelName}):</b><br>` + escapeHtml(reply) + '</div>';
-                    } else {
-                        addWarnMsg("⚠️ Leere Antwort von der Gemini API erhalten.");
-                    }
-                } else {
-                    let errMessage = data.error ? data.error.message : JSON.stringify(data);
-                    addWarnMsg(`⚠️ API-Fehler (${modelName}): ` + errMessage);
-                }
-            } catch (err) {
-                removeLoader();
-                addWarnMsg("⚠️ Netzwerk- oder Verbindungsfehler: " + err.message);
-            }
-
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function removeLoader() {
-            let loader = document.getElementById('loading');
-            if(loader) loader.remove();
-        }
-
-        function addSystemMsg(text) {
-            let chat = document.getElementById('chat');
-            chat.innerHTML += '<div class="system-line">' + text + '</div>';
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function addWarnMsg(text) {
-            let chat = document.getElementById('chat');
-            chat.innerHTML += '<div class="warn-line">' + text + '</div>';
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
     </script>
 </body>
