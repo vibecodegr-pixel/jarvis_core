@@ -1,0 +1,13 @@
+name: Send Push on Complete
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send ntfy Push Notification
+        run: |
+          curl -d "🚀 JARVIS Update komplett fertig & online!" ntfy.sh/jarvis-status-GR-998877
