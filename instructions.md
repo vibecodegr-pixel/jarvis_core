@@ -20,3 +20,6 @@
 - [x] Bereitstellung der Kern-Instruktionen.
 - [ ] Implementierung der ersten Webhook-Schnittstellen für MacroDroid.
 - [ ] Aufbau einer strukturierten Wissensdatenbank im Repository.
+
+## 5. Test-Einträge
+- [x] **GitHub-Verbindungstest:** Erfolgreich durchgeführt. Verbindung zum Repository `vibecodegr-pixel/jarvis_core` steht und Updates funktionieren einwandfrei.
