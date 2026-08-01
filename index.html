@@ -39,8 +39,8 @@
     </div>
 
     <div class="config-box">
-        <input type="password" id="apiKey" placeholder="Gemini API-Key eintragen..." onchange="localStorage.setItem('jarvis_gemini_key', this.value.trim())">
-        <input type="password" id="ghToken" placeholder="GitHub Personal Access Token eintragen..." onchange="localStorage.setItem('jarvis_gh_token', this.value.trim())">
+        <input type="password" id="apiKey" placeholder="Gemini API-Key eintragen..." oninput="localStorage.setItem('jarvis_gemini_key', this.value.trim())">
+        <input type="password" id="ghToken" placeholder="GitHub Personal Access Token eintragen..." oninput="localStorage.setItem('jarvis_gh_token', this.value.trim())">
     </div>
 
     <div id="chat"><div class="system-line">JARVIS Core online. Stabiles Flash-Modul aktiv...</div></div>
@@ -199,7 +199,6 @@
             updateDisplay();
 
             try {
-                // Nutzung des stabilen und freien Flash-Modells
                 let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
                 
                 let requestBody = {
@@ -290,9 +289,15 @@
             chat.scrollTop = chat.scrollHeight;
         }
 
-        ### Der nächste Schritt
-        1. Speichere diesen Code in deine `index.html` auf GitHub.
-        2. Warte, bis die gelbe Kugel verschwunden ist.
-        3. Lade deine Web-App im Browser mit einem Fragezeichen dahinter neu (z.B. `?v=4`), damit der Cache geleert wird.
-        4. Sende exakt diesen Befehl in den Chat:
-           > `Aktualisiere deine instructions.md im Repository eigenhändig mit dem aktuellen System-Status und den neuen Funktionsregeln.`
+        function addWarnMsg(text) {
+            let chat = document.getElementById('chat');
+            chat.innerHTML += '<div class="warn-line">' + text + '</div>';
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+    </script>
+</body>
+</html>
