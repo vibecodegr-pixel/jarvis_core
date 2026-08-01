@@ -42,6 +42,7 @@ jobs:
           import os
           import time
           import json
+          from datetime import datetime
           from huggingface_hub import InferenceClient
 
           start_time = time.time()
@@ -50,7 +51,7 @@ jobs:
 
           print(f'[Tracking] Starte HF-Inferenz für: {command}')
           
-          # 1. Quota laden & prüfen
+          # Quota laden
           quota_file = 'quota.json'
           quota_data = {'cloud_runs': 0, 'total_tokens': 0}
           if os.path.exists(quota_file):
@@ -59,10 +60,9 @@ jobs:
                       quota_data = json.load(f)
               except:
                   pass
-
           quota_data['cloud_runs'] = quota_data.get('cloud_runs', 0) + 1
 
-          # 2. Gedächtnis laden
+          # Gedächtnis laden
           memory_file = 'memory.json'
           history = []
           if os.path.exists(memory_file):
@@ -72,10 +72,24 @@ jobs:
               except:
                   history = []
 
+          # Snapshot-Logik prüfen, falls Befehl nach Snapshot verlangt
+          is_snapshot_req = 'snapshot' in command.lower()
+          is_reset_req = 'reset' in command.lower() or 'export abgeschlossen' in command.lower()
+
+          snapshot_meta_file = 'snapshot_meta.json'
+          last_snapshot_time = 'Start der Historie'
+          if os.path.exists(snapshot_meta_file):
+              try:
+                  with open(snapshot_meta_file, 'r', encoding='utf-8') as f:
+                      meta = json.load(f)
+                      last_snapshot_time = meta.get('last_timestamp', 'Start der Historie')
+              except:
+                  pass
+
           context_str = ''
           if history:
-              context_str = '\n\nBisheriges Gedächtnis (letzte Aktionen):\n' + '\n'.join(
-                  [f'- User: {item[\"cmd\"]} | JARVIS: {item[\"ans\"][:100]}' for item in history[-5:]]
+              context_str = '\n\nBisheriges Gedächtnis:\n' + '\n'.join(
+                  [f'- User: {item[\"cmd\"]} | JARVIS: {item[\"ans\"][:100]}' for item in history[-10:]]
               )
 
           status = 'ERFOLG'
@@ -88,66 +102,80 @@ jobs:
                   token=token
               )
               
-              system_prompt = (
-                  'Du bist JARVIS, ein autonomer Software-Agent mit Langzeitgedächtnis. '
-                  'Führe den Befehl des Benutzers aus. '
-                  'Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Markdown-Wrapper:\n'
-                  '{\n  \"ans\": \"Kurze, natürliche Antwort für den Chat\",\n'
-                  '  \"diff\": \"Hier genaue Code-Änderungen oder betroffenen Dateien im Diff-Format auflisten, falls Code geändert wird. Leer lassen, wenn keine Code-Änderung nötig ist.\"\n'
-                  f'}}{context_str}'
-              )
+              if is_snapshot_req:
+                  # Prompt speziell für den intelligenten Projekt-Snapshot
+                  system_prompt = (
+                      'Du bist JARVIS. Erstelle einen professionellen, flüssig lesbaren Projekt-Snapshot '
+                      'im Markdown-Format basierend auf der Historie seit dem letzten Zeitpunkt (' + last_snapshot_time + ').\n'
+                      'Strukturiere den Bericht in:\n'
+                      '1. Zusammenfassung der wichtigsten Änderungen (was wurde neu erstellt, geprüft oder eingebunden).\n'
+                      '2. Neue Dinge/Erkenntnisse (mit Details).\n'
+                      '3. Gelöschte oder bereinigte Elemente.\n'
+                      'Antworte im JSON-Format:\n'
+                      '{\n  \"ans\": \"Kurze Bestätigung für den Chat\",\n'
+                      '  \"snapshot_content\": \"Der vollständige, strukturierte Markdown-Text für die project_snapshot.md\"\n}'
+                  )
+              else:
+                  system_prompt = (
+                      'Du bist JARVIS, ein autonomer Software-Agent. Führe den Befehl aus.\n'
+                      'Antworte AUSSCHLIESSLICH im JSON-Format:\n'
+                      '{\n  \"ans\": \"Kurze, natürliche Antwort für den Chat\",\n'
+                      '  \"diff\": \"Geplante Code-Änderungen im Diff-Format, falls nötig. Sonst leer.\"\n}'
+                  )
 
               response = client.chat.completions.create(
                   messages=[
                       {'role': 'system', 'content': system_prompt},
                       {'role': 'user', 'content': command}
                   ],
-                  max_tokens=600
+                  max_tokens=800
               )
               raw_content = response.choices[0].message.content.strip()
               
-              # JSON Bereinigung falls Markdown-Wrapper vorhanden sind
-              clean_content = raw_content
-              if clean_content.startswith('```json'):
-                  clean_content = clean_content[7:]
-              if clean_content.startswith('```'):
-                  clean_content = clean_content[3:]
-              if clean_content.endswith('```'):
-                  clean_content = clean_content[:-3]
-              clean_content = clean_content.strip()
+              # JSON Bereinigung
+              if raw_content.startswith('```json'): raw_content = raw_content[7:]
+              if raw_content.startswith('```'): raw_content = raw_content[3:]
+              if raw_content.endswith('```'): raw_content = raw_content[:-3]
+              raw_content = raw_content.strip()
 
-              try:
-                  parsed = json.loads(clean_content)
-                  answer = parsed.get('ans', raw_content)
-                  diff_data = parsed.get('diff', '')
-              except Exception as json_err:
-                  answer = raw_content
-                  diff_data = ''
+              parsed = json.loads(raw_content)
+              answer = parsed.get('ans', 'Aktion ausgeführt.')
+              diff_data = parsed.get('diff', '')
 
-              # Token-Verbrauch grob schätzen und addieren
+              if is_snapshot_req:
+                  snapshot_text = parsed.get('snapshot_content', '# Projekt-Snapshot\n\nKeine Details verfügbar.')
+                  with open('project_snapshot.md', 'w', encoding='utf-8') as f:
+                      f.write(snapshot_text)
+                  diff_data = 'project_snapshot.md aktualisiert.'
+
+              if is_reset_req:
+                  # Meta-Zeitstempel aktualisieren (Zyklus-Reset)
+                  now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                  with open(snapshot_meta_file, 'w', encoding='utf-8') as f:
+                      json.dump({'last_timestamp': now_str}, f, ensure_ascii=False, indent=2)
+                  # Optional: project_snapshot.md nach erfolgreichem Export bereinigen
+                  if os.path.exists('project_snapshot.md'):
+                      os.remove('project_snapshot.md')
+                  answer = 'Snapshot-Zyklus erfolgreich zurückgesetzt.'
+
+              # Token & Memory Update
               used_tokens = len(command.split()) + len(answer.split())
               quota_data['total_tokens'] = quota_data.get('total_tokens', 0) + used_tokens
 
-              # Gedächtnis aktualisieren (inklusive Diff für die UI-Bestätigung)
               history.append({'cmd': command, 'ans': answer, 'diff': diff_data})
               history = history[-15:]
               with open(memory_file, 'w', encoding='utf-8') as f:
                   json.dump(history, f, ensure_ascii=False, indent=2)
 
-              # Quota aktualisieren
               with open(quota_file, 'w', encoding='utf-8') as f:
                   json.dump(quota_data, f, ensure_ascii=False, indent=2)
 
           except Exception as e:
               status = 'FEHLER'
               answer = str(e)
-              diff_data = ''
-              print(f'Fehler aufgetreten: {e}')
+              print(f'Fehler: {e}')
 
           duration = round(time.time() - start_time, 2)
-          print(f'[Tracking] Beendet. Status: {status} | Dauer: {duration}s')
-
-          # Kurze, knackige Push-Nachricht im coolen Vibe für das Handy
           notif_text = f'🤖 JARVIS [{status}] • Lauf #{quota_data[\"cloud_runs\"]} ({duration}s)\n{answer[:100]}'
           with open('/tmp/jarvis_notif.txt', 'w', encoding='utf-8') as f:
               f.write(notif_text)
@@ -157,10 +185,10 @@ jobs:
         run: |
           git config --global user.name 'JARVIS Cloud Agent'
           git config --global user.email 'agent@jarvis.local'
-          git add memory.json quota.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Gedächtnis & Quota mit Diff aktualisiert' && git push)
+          git add memory.json quota.json snapshot_meta.json project_snapshot.md 2>/dev/null || true
+          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Snapshot & Zustand aktualisiert' && git push)
 
-      - name: Benachrichtigung senden (nach Git-Push)
+      - name: Benachrichtigung senden
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
