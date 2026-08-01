@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS Core - Control Center</title>
+    <title>JARVIS Core - Autonomous Control Center</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f12; color: #e4e4ed; padding: 15px; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-between; box-sizing: border-box; }
         h2 { color: #8ab4f8; text-align: center; margin: 0 0 10px 0; font-size: 1.3rem; }
@@ -29,7 +29,7 @@
     </style>
 </head>
 <body>
-    <h2>🤖 JARVIS CORE (AUTONOMOUS)</h2>
+    <h2>🤖 JARVIS CORE (AUTONOMOUS AGENT)</h2>
     
     <div class="dashboard">
         <div class="stat-group">
@@ -45,7 +45,7 @@
         <input type="password" id="ghToken" placeholder="GitHub Personal Access Token eintragen..." onchange="localStorage.setItem('jarvis_gh_token', this.value.trim())">
     </div>
 
-    <div id="chat"><div class="system-line">JARVIS Core online. Autonomes GitHub-Modul integriert...</div></div>
+    <div id="chat"><div class="system-line">JARVIS Core online. Autonomes GitHub-Tooling aktiv...</div></div>
     
     <div class="msg-box">
         <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
@@ -106,15 +106,76 @@
             return { id: "gemini-3.5-flash", name: "FLASH 3.5 (Standard/Schnell)", isPro: false };
         }
 
-        // Automatische Erkennung des GitHub-Repo Namens aus der aktuellen URL
         function getRepoInfo() {
-            // URL-Format: https://username.github.io/reponame/ oder ähnlich
-            let host = window.location.hostname; // z.B. ecodegr-pixel.github.io
+            let host = window.location.hostname;
             let owner = host.split('.')[0];
             let pathSegments = window.location.pathname.split('/').filter(Boolean);
-            let repo = pathSegments.length > 0 ? pathSegments[0] : 'jarvis_core'; // Fallback
+            let repo = pathSegments.length > 0 ? pathSegments[0] : 'jarvis_core';
             return { owner, repo };
         }
+
+        function utf8ToBase64(str) {
+            return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
+                return String.fromCharCode('0x' + p1);
+            }));
+        }
+
+        // GitHub Tool: Datei direkt über die API aktualisieren/erstellen
+        async function githubUpdateFile(path, content, message, token) {
+            let repoInfo = getRepoInfo();
+            let url = `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/contents/${path}`;
+            let headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "vnd.github.v3+json",
+                "Content-Type": "application/json"
+            };
+
+            try {
+                let getRes = await fetch(url, { headers });
+                let sha = null;
+                if (getRes.ok) {
+                    let fileData = await getRes.json();
+                    sha = fileData.sha;
+                }
+
+                let body = {
+                    message: message,
+                    content: utf8ToBase64(content)
+                };
+                if (sha) body.sha = sha;
+
+                let putRes = await fetch(url, {
+                    method: 'PUT',
+                    headers: headers,
+                    body: JSON.stringify(body)
+                });
+
+                if (putRes.ok) {
+                    return { status: "success", message: `Datei ${path} erfolgreich auf GitHub aktualisiert.` };
+                } else {
+                    let errJson = await putRes.json();
+                    return { status: "error", message: errJson.message || "Unbekannter GitHub API Fehler" };
+                }
+            } catch (err) {
+                return { status: "error", message: err.message };
+            }
+        }
+
+        const githubToolsDefinition = [{
+            function_declarations: [{
+                name: "githubUpdateFile",
+                description: "Erstellt oder aktualisiert eine Datei im GitHub-Repository (z.B. instructions.md oder Code-Dateien).",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        path: { type: "STRING", description: "Der relative Pfad der Datei im Repository (z.B. instructions.md)" },
+                        content: { type: "STRING", description: "Der komplette neue Inhalt der Datei." },
+                        message: { type: "STRING", description: "Der Commit-Kommentar (z.B. 'chore: update instructions.md')." }
+                    },
+                    required: ["path", "content", "message"]
+                }
+            }]
+        }];
 
         async function send() {
             let key = document.getElementById('apiKey').value.trim();
@@ -145,18 +206,14 @@
             chat.innerHTML += `<div class="system-line" id="loading">➔ Smart-Router wählt <b>${route.name}</b> – verarbeite...</div>`;
             chat.scrollTop = chat.scrollHeight;
 
-            // System-Instruction aus GitHub laden + Repo-Status übergeben
-            let systemPrompt = "Du bist JARVIS, ein autonomer Assistent.";
+            let systemPrompt = "Du bist JARVIS, ein autonomer Agent.";
             try {
                 let instructRes = await fetch("instructions.md?t=" + new Date().getTime());
-                if(instructRes.ok) {
-                    systemPrompt = await instructRes.text();
-                }
+                if(instructRes.ok) systemPrompt = await instructRes.text();
             } catch(e){}
 
-            // Dem Systemprompt das aktuelle Repository mitteilen, falls er Dateien schreiben soll
             let repoInfo = getRepoInfo();
-            systemPrompt += `\n\n[System-Kontext]\nGitHub Repository: ${repoInfo.owner}/${repoInfo.repo}\nDer Nutzer hat einen GitHub Token hinterlegt. Du kannst ihm Code-Snippets oder Dateiinhalte nennen, die er committen kann, oder (falls implementiert) direkt via API aktualisieren.`;
+            systemPrompt += `\n\n[System-Kontext]\nGitHub Repository: ${repoInfo.owner}/${repoInfo.repo}\nDu hast das Werkzeug 'githubUpdateFile' zur Verfügung, um Dateien direkt im Repository zu ändern. Nutze es aktiv, wenn der Nutzer Code oder Dokumentationen anpasst.`;
 
             sessionQuota--;
             if (route.isPro) {
@@ -171,21 +228,73 @@
             try {
                 let url = `https://generativelanguage.googleapis.com/v1beta/models/${route.id}:generateContent?key=${key}`;
                 
+                let requestBody = {
+                    system_instruction: { parts: [{ text: systemPrompt }] },
+                    contents: [{ parts: [{ text: msg }] }],
+                    tools: githubToolsDefinition
+                };
+
                 let response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        system_instruction: { parts: [{ text: systemPrompt }] },
-                        contents: [{ parts: [{ text: msg }] }]
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 let data = await response.json();
                 removeLoader();
 
-                if (response.ok && data.candidates && data.candidates[0].content.parts[0].text) {
-                    let reply = data.candidates[0].content.parts[0].text;
-                    chat.innerHTML += '<div class="agent-line"><b>JARVIS (' + (route.isPro ? 'PRO' : 'FLASH') + '):</b><br>' + escapeHtml(reply) + '</div>';
+                if (response.ok && data.candidates && data.candidates[0].content.parts) {
+                    let parts = data.candidates[0].content.parts;
+                    let part = parts[0];
+
+                    // Prüfen ob JARVIS ein Function Call auslöst
+                    if (part.functionCall) {
+                        let fnName = part.functionCall.name;
+                        let fnArgs = part.functionCall.args;
+
+                        if (!ghToken) {
+                            addWarnMsg("⚠️ JARVIS möchte eine Datei auf GitHub ändern, aber es ist kein GitHub Token eingetragen!");
+                            return;
+                        }
+
+                        addSystemMsg(`⚙️ JARVIS führt autonom aus: <b>${fnName}</b> (${fnArgs.path})...`);
+
+                        let toolResult = { status: "error", message: "Unknown tool" };
+                        if (fnName === "githubUpdateFile") {
+                            toolResult = await githubUpdateFile(fnArgs.path, fnArgs.content, fnArgs.message, ghToken);
+                        }
+
+                        // Ergebnis an Gemini zurückschicken für die finale Antwort
+                        let followUpBody = {
+                            system_instruction: { parts: [{ text: systemPrompt }] },
+                            contents: [
+                                { role: "user", parts: [{ text: msg }] },
+                                { role: "model", parts: [part] },
+                                { role: "function", parts: [{ functionResponse: { name: fnName, response: toolResult } }] }
+                            ],
+                            tools: githubToolsDefinition
+                        };
+
+                        let followUpRes = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(followUpBody)
+                        });
+
+                        let followUpData = await followUpRes.json();
+                        if (followUpRes.ok && followUpData.candidates && followUpData.candidates[0].content.parts[0].text) {
+                            let finalReply = followUpData.candidates[0].content.parts[0].text;
+                            chat.innerHTML += '<div class="agent-line"><b>JARVIS (' + (route.isPro ? 'PRO' : 'FLASH') + '):</b><br>' + escapeHtml(finalReply) + '</div>';
+                        } else {
+                            addSystemMsg(`✅ Tool ausgeführt (${toolResult.status}): ${toolResult.message}`);
+                        }
+
+                    } else if (part.text) {
+                        let reply = part.text;
+                        chat.innerHTML += '<div class="agent-line"><b>JARVIS (' + (route.isPro ? 'PRO' : 'FLASH') + '):</b><br>' + escapeHtml(reply) + '</div>';
+                    } else {
+                        addWarnMsg("⚠️ Leere Antwort von der Gemini API erhalten.");
+                    }
                 } else {
                     let errMessage = data.error ? data.error.message : JSON.stringify(data);
                     addWarnMsg(`⚠️ API-Fehler (${route.id}): ` + errMessage);
