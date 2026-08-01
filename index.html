@@ -12,7 +12,6 @@
         .stat-group { display: flex; gap: 15px; flex-wrap: wrap; }
         .stat-item { color: #aaa; }
         .stat-val { color: #8ab4f8; font-weight: bold; }
-        .stat-pro { color: #f2a65a; font-weight: bold; }
         .stat-flash { color: #5cf28e; font-weight: bold; }
         .btn-small { padding: 6px 12px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.75rem; }
         
@@ -29,11 +28,10 @@
     </style>
 </head>
 <body>
-    <h2>🤖 JARVIS CORE (AUTONOMOUS AGENT)</h2>
+    <h2>🤖 JARVIS CORE (STABLE FLASH)</h2>
     
     <div class="dashboard">
         <div class="stat-group">
-            <div class="stat-item">⚡ PRO übrig: <span class="stat-pro" id="proCount">50</span>/50</div>
             <div class="stat-item">🚀 FLASH übrig: <span class="stat-flash" id="flashCount">1500</span>/1500</div>
             <div class="stat-item">🛡️ Session-Puffer: <span class="stat-val" id="sessionQuota">100</span></div>
         </div>
@@ -45,7 +43,7 @@
         <input type="password" id="ghToken" placeholder="GitHub Personal Access Token eintragen..." onchange="localStorage.setItem('jarvis_gh_token', this.value.trim())">
     </div>
 
-    <div id="chat"><div class="system-line">JARVIS Core online. Autonomes GitHub-Tooling aktiv...</div></div>
+    <div id="chat"><div class="system-line">JARVIS Core online. Stabiles Flash-Modul aktiv...</div></div>
     
     <div class="msg-box">
         <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
@@ -61,19 +59,15 @@
         
         if (savedDate !== todayStr) {
             localStorage.setItem('jarvis_date', todayStr);
-            localStorage.setItem('jarvis_pro_used', '0');
             localStorage.setItem('jarvis_flash_used', '0');
         }
 
-        let proUsed = parseInt(localStorage.getItem('jarvis_pro_used') || '0');
         let flashUsed = parseInt(localStorage.getItem('jarvis_flash_used') || '0');
         let sessionQuota = 100;
         let lastRequests = [];
 
         function updateDisplay() {
-            let proLeft = Math.max(0, 50 - proUsed);
             let flashLeft = Math.max(0, 1500 - flashUsed);
-            document.getElementById('proCount').innerText = proLeft;
             document.getElementById('flashCount').innerText = flashLeft;
             document.getElementById('sessionQuota').innerText = sessionQuota;
         }
@@ -93,19 +87,6 @@
             return duplicates.length >= 2;
         }
 
-        function smartRoute(text) {
-            const hasCodeSyntax = /[{};=<>]/g.test(text) && text.length > 25;
-            const techTerms = ['code', 'fehler', 'bug', 'script', 'html', 'css', 'js', 'javascript', 'python', 'json', 'github', 'fix', 'funktioniert nicht', 'wieso', 'warum', 'schleife', 'api', 'repository', 'commit', 'anleitung', 'erkläre', 'optimier', 'schreibe', 'bau', 'system', 'problem'];
-            const lower = text.toLowerCase();
-            const hasTechTerm = techTerms.some(term => lower.includes(term));
-            const isLong = text.length > 130;
-
-            if (hasCodeSyntax || hasTechTerm || isLong) {
-                return { id: "gemini-3.1-pro-preview", name: "PRO 3.1 (Komplex/Code)", isPro: true };
-            }
-            return { id: "gemini-3.5-flash", name: "FLASH 3.5 (Standard/Schnell)", isPro: false };
-        }
-
         function getRepoInfo() {
             let host = window.location.hostname;
             let owner = host.split('.')[0];
@@ -120,7 +101,6 @@
             }));
         }
 
-        // GitHub Tool: Datei direkt über die API aktualisieren/erstellen
         async function githubUpdateFile(path, content, message, token) {
             let repoInfo = getRepoInfo();
             let url = `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/contents/${path}`;
@@ -197,13 +177,11 @@
                 return;
             }
 
-            let route = smartRoute(msg);
-
             chat.innerHTML += '<div class="user-line"><b>Du:</b> ' + escapeHtml(msg) + '</div>';
             msgInput.value = '';
             chat.scrollTop = chat.scrollHeight;
 
-            chat.innerHTML += `<div class="system-line" id="loading">➔ Smart-Router wählt <b>${route.name}</b> – verarbeite...</div>`;
+            chat.innerHTML += `<div class="system-line" id="loading">➔ Verarbeite mit Gemini 1.5 Flash...</div>`;
             chat.scrollTop = chat.scrollHeight;
 
             let systemPrompt = "Du bist JARVIS, ein autonomer Agent.";
@@ -216,17 +194,13 @@
             systemPrompt += `\n\n[System-Kontext]\nGitHub Repository: ${repoInfo.owner}/${repoInfo.repo}\nDu hast das Werkzeug 'githubUpdateFile' zur Verfügung, um Dateien direkt im Repository zu ändern. Nutze es aktiv, wenn der Nutzer Code oder Dokumentationen anpasst.`;
 
             sessionQuota--;
-            if (route.isPro) {
-                proUsed++;
-                localStorage.setItem('jarvis_pro_used', proUsed);
-            } else {
-                flashUsed++;
-                localStorage.setItem('jarvis_flash_used', flashUsed);
-            }
+            flashUsed++;
+            localStorage.setItem('jarvis_flash_used', flashUsed);
             updateDisplay();
 
             try {
-                let url = `https://generativelanguage.googleapis.com/v1beta/models/${route.id}:generateContent?key=${key}`;
+                // Nutzung des stabilen und freien Flash-Modells
+                let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
                 
                 let requestBody = {
                     system_instruction: { parts: [{ text: systemPrompt }] },
@@ -247,7 +221,6 @@
                     let parts = data.candidates[0].content.parts;
                     let part = parts[0];
 
-                    // Prüfen ob JARVIS ein Function Call auslöst
                     if (part.functionCall) {
                         let fnName = part.functionCall.name;
                         let fnArgs = part.functionCall.args;
@@ -264,7 +237,6 @@
                             toolResult = await githubUpdateFile(fnArgs.path, fnArgs.content, fnArgs.message, ghToken);
                         }
 
-                        // Ergebnis an Gemini zurückschicken für die finale Antwort
                         let followUpBody = {
                             system_instruction: { parts: [{ text: systemPrompt }] },
                             contents: [
@@ -284,20 +256,20 @@
                         let followUpData = await followUpRes.json();
                         if (followUpRes.ok && followUpData.candidates && followUpData.candidates[0].content.parts[0].text) {
                             let finalReply = followUpData.candidates[0].content.parts[0].text;
-                            chat.innerHTML += '<div class="agent-line"><b>JARVIS (' + (route.isPro ? 'PRO' : 'FLASH') + '):</b><br>' + escapeHtml(finalReply) + '</div>';
+                            chat.innerHTML += '<div class="agent-line"><b>JARVIS (FLASH):</b><br>' + escapeHtml(finalReply) + '</div>';
                         } else {
                             addSystemMsg(`✅ Tool ausgeführt (${toolResult.status}): ${toolResult.message}`);
                         }
 
                     } else if (part.text) {
                         let reply = part.text;
-                        chat.innerHTML += '<div class="agent-line"><b>JARVIS (' + (route.isPro ? 'PRO' : 'FLASH') + '):</b><br>' + escapeHtml(reply) + '</div>';
+                        chat.innerHTML += '<div class="agent-line"><b>JARVIS (FLASH):</b><br>' + escapeHtml(reply) + '</div>';
                     } else {
                         addWarnMsg("⚠️ Leere Antwort von der Gemini API erhalten.");
                     }
                 } else {
                     let errMessage = data.error ? data.error.message : JSON.stringify(data);
-                    addWarnMsg(`⚠️ API-Fehler (${route.id}): ` + errMessage);
+                    addWarnMsg(`⚠️ API-Fehler (gemini-1.5-flash): ` + errMessage);
                 }
             } catch (err) {
                 removeLoader();
@@ -318,15 +290,9 @@
             chat.scrollTop = chat.scrollHeight;
         }
 
-        function addWarnMsg(text) {
-            let chat = document.getElementById('chat');
-            chat.innerHTML += '<div class="warn-line">' + text + '</div>';
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-    </script>
-</body>
-</html>
+        ### Der nächste Schritt
+        1. Speichere diesen Code in deine `index.html` auf GitHub.
+        2. Warte, bis die gelbe Kugel verschwunden ist.
+        3. Lade deine Web-App im Browser mit einem Fragezeichen dahinter neu (z.B. `?v=4`), damit der Cache geleert wird.
+        4. Sende exakt diesen Befehl in den Chat:
+           > `Aktualisiere deine instructions.md im Repository eigenhändig mit dem aktuellen System-Status und den neuen Funktionsregeln.`
