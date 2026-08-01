@@ -3,97 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS Core - Autonomous Self-Correcting Agent</title>
+    <title>JARVIS Cloud Control</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f12; color: #e4e4ed; padding: 15px; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-between; box-sizing: border-box; }
         h2 { color: #8ab4f8; text-align: center; margin: 0 0 10px 0; font-size: 1.3rem; }
         
-        .dashboard { background: #181824; border: 1px solid #2a2a38; border-radius: 10px; padding: 10px 15px; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; }
-        .stat-group { display: flex; gap: 15px; flex-wrap: wrap; }
-        .stat-item { color: #aaa; }
-        .stat-val { color: #8ab4f8; font-weight: bold; }
-        .stat-flash { color: #5cf28e; font-weight: bold; }
-        .btn-small { padding: 6px 12px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.75rem; }
+        .dashboard { background: #181824; border: 1px solid #2a2a38; border-radius: 10px; padding: 10px 15px; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.85rem; }
+        .btn-small { padding: 6px 12px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; }
         .btn-cloud { background: #5cf28e; }
         
         #chat { flex-grow: 1; border: 1px solid #2a2a35; padding: 15px; margin-bottom: 12px; overflow-y: auto; background: #16161f; border-radius: 10px; }
         .user-line { margin: 10px 0; color: #e4e4ed; }
         .system-line { margin: 10px 0; color: #8ab4f8; font-style: italic; font-size: 0.85rem; }
         .warn-line { margin: 10px 0; color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; word-break: break-all; font-size: 0.85rem; }
-        .agent-line { margin: 10px 0; color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #8ab4f8; white-space: pre-wrap; line-height: 1.4; font-size: 0.95rem; }
+        .agent-line { margin: 10px 0; color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #5cf28e; white-space: pre-wrap; line-height: 1.4; font-size: 0.95rem; }
         
         .config-box { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
         input[type="password"], input[type="text"] { width: 100%; padding: 12px; background: #22222e; color: #fff; border: 1px solid #3a3a4c; border-radius: 8px; outline: none; box-sizing: border-box; font-size: 0.9rem; }
         .msg-box { display: flex; gap: 8px; width: 100%; }
-        .btn-send { padding: 12px 20px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+        .btn-send { padding: 12px 20px; background: #5cf28e; color: #0f0f12; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
     </style>
 </head>
 <body>
-    <h2>🤖 JARVIS CORE (CLOUD AGENT)</h2>
+    <h2>🤖 JARVIS CLOUD CONTROL</h2>
     
     <div class="dashboard">
-        <div class="stat-group">
-            <div class="stat-item">🚀 Anfragen übrig: <span class="stat-flash" id="flashCount">1500</span>/1500</div>
-            <div class="stat-item">🛡️ Session-Puffer: <span class="stat-val" id="sessionQuota">100</span></div>
-        </div>
+        <div style="color: #aaa;">Status: <span style="color: #5cf28e; font-weight: bold;">Qwen Cloud Agent aktiv</span></div>
         <div style="display: flex; gap: 6px;">
-            <button class="btn-small" onclick="releaseQuota(100)">+ 100 Puffer</button>
-            <button class="btn-small btn-cloud" onclick="triggerJarvisAgent()">🚀 Cloud-Agent starten</button>
+            <a id="downloadLink" class="btn-small" href="#" onclick="downloadRepoZip(event)">📦 Repo als ZIP</a>
+            <button class="btn-small btn-cloud" onclick="triggerJarvisAgent()">🚀 Direkt starten</button>
         </div>
     </div>
 
     <div class="config-box">
-        <input type="password" id="apiKey" placeholder="Gemini API-Key eintragen..." oninput="localStorage.setItem('jarvis_gemini_key', this.value.trim())">
         <input type="password" id="ghToken" placeholder="GitHub Personal Access Token eintragen..." oninput="localStorage.setItem('jarvis_gh_token', this.value.trim())">
-        <input type="text" id="modelName" placeholder="Modell-ID..." value="gemini-3.5-flash" oninput="localStorage.setItem('jarvis_model_name', this.value.trim())">
         <input type="text" id="ntfyTopic" placeholder="ntfy.sh Thema (z.B. jarvis-status-GR-998877)..." oninput="localStorage.setItem('jarvis_ntfy_topic', this.value.trim())">
     </div>
 
-    <div id="chat"><div class="system-line">JARVIS Core Steuerzentrale online. Cloud-Agent Steuerung bereit...</div></div>
+    <div id="chat"><div class="system-line">Steuerzentrale bereit. Befehl eingeben und absenden...</div></div>
     
     <div class="msg-box">
-        <input type="text" id="msg" placeholder="Befehl für JARVIS (oder direkt Cloud-Agent starten)..." onkeypress="if(event.key === 'Enter') send();">
-        <button class="btn-send" onclick="send()">Senden</button>
+        <input type="text" id="msg" placeholder="Befehl für JARVIS..." onkeypress="if(event.key === 'Enter') triggerJarvisAgent();">
+        <button class="btn-send" onclick="triggerJarvisAgent()">Senden</button>
     </div>
 
     <script>
-        document.getElementById('apiKey').value = localStorage.getItem('jarvis_gemini_key') || '';
         document.getElementById('ghToken').value = localStorage.getItem('jarvis_gh_token') || '';
-        document.getElementById('modelName').value = localStorage.getItem('jarvis_model_name') || 'gemini-3.5-flash';
         document.getElementById('ntfyTopic').value = localStorage.getItem('jarvis_ntfy_topic') || '';
-        
-        let todayStr = new Date().toISOString().slice(0, 10);
-        let savedDate = localStorage.getItem('jarvis_date');
-        
-        if (savedDate !== todayStr) {
-            localStorage.setItem('jarvis_date', todayStr);
-            localStorage.setItem('jarvis_flash_used', '0');
-        }
-
-        let flashUsed = parseInt(localStorage.getItem('jarvis_flash_used') || '0');
-        let sessionQuota = 100;
-        let lastRequests = [];
-
-        function updateDisplay() {
-            let flashLeft = Math.max(0, 1500 - flashUsed);
-            document.getElementById('flashCount').innerText = flashLeft;
-            document.getElementById('sessionQuota').innerText = sessionQuota;
-        }
-        updateDisplay();
-
-        function releaseQuota(amount) {
-            sessionQuota += amount;
-            updateDisplay();
-            addSystemMsg(`✅ Session-Puffer um +${amount} erhöht. (Verfügbar: ${sessionQuota})`);
-        }
-
-        function detectLoop(promptText) {
-            let now = Date.now();
-            lastRequests = lastRequests.filter(r => (now - r.time) < 30000);
-            let duplicates = lastRequests.filter(r => r.prompt === promptText);
-            lastRequests.push({ prompt: promptText, time: now });
-            return duplicates.length >= 2;
-        }
 
         function getRepoInfo() {
             let host = window.location.hostname;
@@ -103,30 +59,32 @@
             return { owner, repo };
         }
 
-        function utf8ToBase64(str) {
-            let bytes = new TextEncoder().encode(str);
-            let binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
-            return btoa(binString);
+        function downloadRepoZip(e) {
+            e.preventDefault();
+            let repoInfo = getRepoInfo();
+            let zipUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}/archive/refs/heads/main.zip`;
+            window.open(zipUrl, '_blank');
+            addSystemMsg("📦 Full-Repo ZIP-Download gestartet.");
         }
 
-        function base64ToUtf8(base64) {
-            let binString = atob(base64.replace(/\n/g, ''));
-            let bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
-            return new TextDecoder().decode(bytes);
-        }
-
-        // NEU: Löst den GitHub Workflow (jarvis-agent.yml) direkt aus der Web-UI aus
         async function triggerJarvisAgent() {
             let ghToken = document.getElementById('ghToken').value.trim() || localStorage.getItem('jarvis_gh_token');
             let msgInput = document.getElementById('msg');
-            let commandText = msgInput.value.trim() || 'System-Check';
+            let commandText = msgInput.value.trim();
 
             if (!ghToken) {
-                alert('Bitte trage zuerst deinen GitHub Personal Access Token in das entsprechende Feld ein!');
+                alert('Bitte trage zuerst deinen GitHub Personal Access Token ein!');
                 return;
             }
+            if (!commandText) return;
 
             let repoInfo = getRepoInfo();
+            
+            let chat = document.getElementById('chat');
+            chat.innerHTML += '<div class="user-line"><b>Du:</b> ' + escapeHtml(commandText) + '</div>';
+            msgInput.value = '';
+            chat.scrollTop = chat.scrollHeight;
+
             addSystemMsg(`🚀 Sende Befehl an GitHub Cloud-Agent (${repoInfo.owner}/${repoInfo.repo})...`);
 
             try {
@@ -146,262 +104,26 @@
                 });
 
                 if (response.ok) {
-                    addSystemMsg('✅ GitHub Workflow in der Cloud gestartet! Der Server verarbeitet den Befehl und sendet dir gleich eine Push-Benachrichtigung aufs Handy.');
-                    msgInput.value = '';
+                    addAgentMsg("✅ Befehl erfolgreich an die Cloud übergeben! Der GitHub-Agent verarbeitet ihn im Hintergrund[span_1](start_span)[span_1](end_span). Du erhältst gleich deine Push-Benachrichtigung aufs Handy, sobald alles live ist.");
                 } else {
                     let errJson = await response.json();
-                    addWarnMsg('⚠️ Fehler beim Starten des Cloud-Agenten: ' + (errJson.message || response.statusText));
+                    addWarnMsg('⚠️ Fehler beim Starten: ' + (errJson.message || response.statusText));
                 }
             } catch (error) {
-                addWarnMsg('⚠️ Netzwerkfehler beim Cloud-Trigger: ' + error.message);
+                addWarnMsg('⚠️ Netzwerkfehler: ' + error.message);
             }
-        }
-
-        async function githubGetFile(path, token) {
-            let repoInfo = getRepoInfo();
-            let url = `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/contents/${path}`;
-            let headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "vnd.github.v3+json"
-            };
-
-            try {
-                let res = await fetch(url, { headers });
-                if (res.ok) {
-                    let data = await res.json();
-                    let decodedContent = base64ToUtf8(data.content);
-                    return { status: "success", content: decodedContent, sha: data.sha };
-                } else {
-                    let errJson = await res.json();
-                    return { status: "error", message: errJson.message || "Datei nicht gefunden" };
-                }
-            } catch (err) {
-                return { status: "error", message: err.message };
-            }
-        }
-
-        async function githubUpdateFile(path, content, message, token) {
-            let repoInfo = getRepoInfo();
-            let url = `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/contents/${path}`;
-            let headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "vnd.github.v3+json",
-                "Content-Type": "application/json"
-            };
-
-            try {
-                let getRes = await fetch(url, { headers });
-                let sha = null;
-                if (getRes.ok) {
-                    let fileData = await getRes.json();
-                    sha = fileData.sha;
-                }
-
-                let body = {
-                    message: message,
-                    content: utf8ToBase64(content)
-                };
-                if (sha) body.sha = sha;
-
-                let putRes = await fetch(url, {
-                    method: 'PUT',
-                    headers: headers,
-                    body: JSON.stringify(body)
-                });
-
-                if (putRes.ok) {
-                    return { status: "success", message: `Datei ${path} erfolgreich auf GitHub aktualisiert.` };
-                } else {
-                    let errJson = await putRes.json();
-                    return { status: "error", message: errJson.message || "Unbekannter GitHub API Fehler" };
-                }
-            } catch (err) {
-                return { status: "error", message: err.message };
-            }
-        }
-
-        const githubToolsDefinition = [{
-            function_declarations: [
-                {
-                    name: "githubGetFile",
-                    description: "Liest den aktuellen Inhalt und SHA einer Datei aus dem GitHub-Repository aus.",
-                    parameters: {
-                        type: "OBJECT",
-                        properties: {
-                            path: { type: "STRING", description: "Der relative Pfad der Datei" }
-                        },
-                        required: ["path"]
-                    }
-                },
-                {
-                    name: "githubUpdateFile",
-                    description: "Aktualisiert eine Datei im GitHub-Repository.",
-                    parameters: {
-                        type: "OBJECT",
-                        properties: {
-                            path: { type: "STRING", description: "Der relative Pfad der Datei" },
-                            content: { type: "STRING", description: "Der komplette neue Inhalt." },
-                            message: { type: "STRING", description: "Der Commit-Kommentar." }
-                        },
-                        required: ["path", "content", "message"]
-                    }
-                }
-            ]
-        }];
-
-        async function send() {
-            let key = document.getElementById('apiKey').value.trim();
-            let ghToken = document.getElementById('ghToken').value.trim();
-            let modelName = document.getElementById('modelName').value.trim() || 'gemini-3.5-flash';
-            let msgInput = document.getElementById('msg');
-            let msg = msgInput.value.trim();
-            let chat = document.getElementById('chat');
-
-            if(!key) { alert('Bitte trage zuerst deinen Gemini API-Key ein!'); return; }
-            if(!msg) return;
-
-            if(sessionQuota <= 0) {
-                addWarnMsg("⚠️ Session-Puffer leer! Klicke oben auf '+ 100 Puffer'.");
-                return;
-            }
-
-            if(detectLoop(msg)) {
-                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert.");
-                return;
-            }
-
-            chat.innerHTML += '<div class="user-line"><b>Du:</b> ' + escapeHtml(msg) + '</div>';
-            msgInput.value = '';
             chat.scrollTop = chat.scrollHeight;
-
-            chat.innerHTML += `<div class="system-line" id="loading">➔ Verarbeite mit ${modelName}...</div>`;
-            chat.scrollTop = chat.scrollHeight;
-
-            let systemPrompt = "Du bist JARVIS, ein autonomer, fehlertoleranter Software-Agent.";
-            try {
-                let instructRes = await fetch("instructions.md?t=" + new Date().getTime());
-                if(instructRes.ok) systemPrompt = await instructRes.text();
-            } catch(e){}
-
-            let repoInfo = getRepoInfo();
-            systemPrompt += `\n\n[System-Kontext]\nGitHub Repository: ${repoInfo.owner}/${repoInfo.repo}`;
-
-            sessionQuota--;
-            flashUsed++;
-            localStorage.setItem('jarvis_flash_used', flashUsed);
-            updateDisplay();
-
-            let contents = [
-                { role: "user", parts: [{ text: msg }] }
-            ];
-
-            try {
-                let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
-                
-                for (let step = 0; step < 5; step++) {
-                    if (step > 0) {
-                        addSystemMsg("⏳ Pacing-Sperre aktiv: Warte 6 Sekunden...");
-                        await new Promise(resolve => setTimeout(resolve, 6000));
-                    }
-
-                    let requestBody = {
-                        system_instruction: { parts: [{ text: systemPrompt }] },
-                        contents: contents,
-                        tools: githubToolsDefinition
-                    };
-
-                    let response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(requestBody)
-                    });
-
-                    let data = await response.json();
-                    if (!response.ok) {
-                        let errMessage = data.error ? data.error.message : JSON.stringify(data);
-                        
-                        let match = errMessage.match(/Please retry in ([0-9.]+)s/);
-                        if (match) {
-                            let waitSec = parseFloat(match[1]);
-                            let waitMs = Math.ceil(waitSec * 1000) + 1000;
-                            addWarnMsg(`⏳ Free-Tier Limit erreicht. Warte ${Math.ceil(waitSec)}s...`);
-                            await new Promise(resolve => setTimeout(resolve, waitMs));
-                            step--;
-                            continue;
-                        }
-
-                        addWarnMsg(`⚠️ API-Fehler (${modelName}): ` + errMessage);
-                        break;
-                    }
-
-                    let candidate = data.candidates && data.candidates[0];
-                    if (!candidate || !candidate.content || !candidate.content.parts) {
-                        addWarnMsg("⚠️ Leere Antwort von der Gemini API erhalten.");
-                        break;
-                    }
-
-                    let parts = candidate.content.parts;
-                    let functionCallPart = parts.find(p => p.functionCall);
-
-                    if (functionCallPart) {
-                        let fnName = functionCallPart.functionCall.name;
-                        let fnArgs = functionCallPart.functionCall.args;
-
-                        if (!ghToken) {
-                            addWarnMsg("⚠️ Kein GitHub Token eingetragen!");
-                            break;
-                        }
-
-                        addSystemMsg(`⚙️ JARVIS führt aus: <b>${fnName}</b>...`);
-
-                        let toolResult = {};
-                        if (fnName === "githubGetFile") {
-                            toolResult = await githubGetFile(fnArgs.path, ghToken);
-                        } else if (fnName === "githubUpdateFile") {
-                            toolResult = await githubUpdateFile(fnArgs.path, fnArgs.content, fnArgs.message, ghToken);
-                        } else {
-                            toolResult = { status: "error", message: "Unknown tool" };
-                        }
-
-                        contents.push({ role: "model", parts: parts });
-                        contents.push({
-                            role: "function",
-                            parts: [{
-                                functionResponse: {
-                                    name: fnName,
-                                    response: toolResult
-                                }
-                            }]
-                        });
-                        continue;
-                    }
-
-                    let textPart = parts.find(p => p.text);
-                    if (textPart) {
-                        let reply = textPart.text;
-                        chat.innerHTML += `<div class="agent-line"><b>JARVIS (${modelName}):</b><br>` + escapeHtml(reply) + '</div>';
-                    }
-                    break;
-                }
-
-                removeLoader();
-
-            } catch (err) {
-                removeLoader();
-                addWarnMsg("⚠️ Netzwerkfehler: " + err.message);
-            }
-
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function removeLoader() {
-            let loader = document.getElementById('loading');
-            if(loader) loader.remove();
         }
 
         function addSystemMsg(text) {
             let chat = document.getElementById('chat');
             chat.innerHTML += '<div class="system-line">' + text + '</div>';
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function addAgentMsg(text) {
+            let chat = document.getElementById('chat');
+            chat.innerHTML += '<div class="agent-line">' + text + '</div>';
             chat.scrollTop = chat.scrollHeight;
         }
 
