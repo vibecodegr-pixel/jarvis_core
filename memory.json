@@ -6,5 +6,9 @@
   {
     "cmd": "Such mir den Link des heute am meisten geschauten videos auf youtube.",
     "ans": "Der genaue Link zum heute am meisten angesehenen YouTube-Video kann sich stündlich ändern und ist nicht direkt zugänglich. Sie können jedoch das aktuell meistgesehene Video durch Suchen nach \"Trending auf YouTube\" finden."
+  },
+  {
+    "cmd": "System-Check",
+    "ans": "System-Check: Vollständig. Alles in Ordnung."
   }
 ]
