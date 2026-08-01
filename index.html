@@ -16,7 +16,7 @@
         #chat { flex-grow: 1; border: 1px solid #2a2a35; padding: 15px; margin-bottom: 15px; overflow-y: auto; background: #16161f; border-radius: 12px; }
         .user-line { margin: 10px 0; color: #e4e4ed; }
         .system-line { margin: 10px 0; color: #8ab4f8; font-style: italic; }
-        .warn-line { margin: 10px 0; color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; }
+        .warn-line { margin: 10px 0; color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; word-break: break-all; }
         .agent-line { margin: 10px 0; color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #8ab4f8; white-space: pre-wrap; line-height: 1.4; }
         
         .config-box { margin-bottom: 15px; }
@@ -35,10 +35,10 @@
     </div>
 
     <div class="config-box">
-        <input type="password" id="apiKey" placeholder="Gemini API-Key eintragen..." onchange="localStorage.setItem('jarvis_gemini_key', this.value)">
+        <input type="password" id="apiKey" placeholder="Gemini API-Key hier einfügen..." onchange="localStorage.setItem('jarvis_gemini_key', this.value.trim())">
     </div>
 
-    <div id="chat"><div class="system-line">JARVIS Core online. Schutzsysteme aktiv...</div></div>
+    <div id="chat"><div class="system-line">JARVIS Core bereit. Verbinde mit Gemini API...</div></div>
     
     <div class="msg-box">
         <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
@@ -74,16 +74,16 @@
             let msg = msgInput.value.trim();
             let chat = document.getElementById('chat');
 
-            if(!key) { alert('Bitte zuerst deinen Gemini API-Key eintragen!'); return; }
+            if(!key) { alert('Bitte trage zuerst deinen Gemini API-Key in das Textfeld ein!'); return; }
             if(!msg) return;
 
             if(sessionQuota <= 0) {
-                addWarnMsg("⚠️ Session-Limit erreicht! Klicke oben auf '+ 100 Freigeben', um fortzufahren.");
+                addWarnMsg("⚠️ Session-Limit erreicht! Klicke oben auf '+ 100 Freigeben'.");
                 return;
             }
 
             if(detectLoop(msg)) {
-                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert. Ausführung gestoppt.");
+                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert.");
                 return;
             }
 
@@ -91,64 +91,49 @@
             msgInput.value = '';
             chat.scrollTop = chat.scrollHeight;
 
-            chat.innerHTML += '<div class="system-line" id="loading">➔ JARVIS verarbeitet...</div>';
+            chat.innerHTML += '<div class="system-line" id="loading">➔ JARVIS antwortet gleich...</div>';
             chat.scrollTop = chat.scrollHeight;
 
-            // System-Instruction laden
+            // Anweisung laden
             let systemPrompt = "Du bist JARVIS, ein autonomer Assistent.";
             try {
                 let instructRes = await fetch("instructions.md?t=" + new Date().getTime());
                 if(instructRes.ok) systemPrompt = await instructRes.text();
             } catch(e){}
 
-            // Robuste Modell-Kandidaten (Reihenfolge der Priorität)
-            const modelsToTry = [
-                'gemini-1.5-flash',
-                'gemini-1.5-flash-latest',
-                'gemini-1.5-pro',
-                'gemini-pro'
-            ];
+            // Direkter, sauberer API-Aufruf an das offizielle gemini-1.5-flash Modell
+            try {
+                let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+                
+                let response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_instruction: { parts: [{ text: systemPrompt }] },
+                        contents: [{ parts: [{ text: msg }] }]
+                    })
+                });
 
-            let success = false;
-            let lastError = null;
-
-            for (let modelName of modelsToTry) {
-                try {
-                    let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            system_instruction: { parts: [{ text: systemPrompt }] },
-                            contents: [{ parts: [{ text: msg }] }]
-                        })
-                    });
-
-                    let data = await response.json();
-
-                    if (data.candidates && data.candidates[0].content.parts[0].text) {
-                        removeLoader();
-                        let reply = data.candidates[0].content.parts[0].text;
-                        chat.innerHTML += '<div class="agent-line"><b>JARVIS:</b><br>' + escapeHtml(reply) + '</div>';
-                        
-                        sessionQuota--;
-                        dailyTotal++;
-                        document.getElementById('sessionQuota').innerText = sessionQuota;
-                        document.getElementById('dailyTotal').innerText = dailyTotal;
-                        localStorage.setItem('jarvis_daily_total', dailyTotal);
-                        
-                        success = true;
-                        break; // Erfolgreich ausgeführt!
-                    } else {
-                        lastError = data;
-                    }
-                } catch (e) {
-                    lastError = e.message;
-                }
-            }
-
-            if (!success) {
+                let data = await response.json();
                 removeLoader();
-                addWarnMsg("⚠️ API-Fehler: " + JSON.stringify(lastError));
+
+                if (response.ok && data.candidates && data.candidates[0].content.parts[0].text) {
+                    let reply = data.candidates[0].content.parts[0].text;
+                    chat.innerHTML += '<div class="agent-line"><b>JARVIS:</b><br>' + escapeHtml(reply) + '</div>';
+                    
+                    sessionQuota--;
+                    dailyTotal++;
+                    document.getElementById('sessionQuota').innerText = sessionQuota;
+                    document.getElementById('dailyTotal').innerText = dailyTotal;
+                    localStorage.setItem('jarvis_daily_total', dailyTotal);
+                } else {
+                    // Falls Google einen Fehler meldet, zeigen wir ihn exakt an
+                    let errMessage = data.error ? data.error.message : JSON.stringify(data);
+                    addWarnMsg("⚠️ API-Fehler von Google: " + errMessage);
+                }
+            } catch (err) {
+                removeLoader();
+                addWarnMsg("⚠️ Netzwerkausfall/Verbindungsfehler: " + err.message);
             }
 
             chat.scrollTop = chat.scrollHeight;
