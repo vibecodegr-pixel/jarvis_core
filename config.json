@@ -1,0 +1,6 @@
+{
+  "agent_name": "JARVIS",
+  "version": "1.0.0",
+  "max_session_quota": 100,
+  "max_daily_requests": 1400
+}
