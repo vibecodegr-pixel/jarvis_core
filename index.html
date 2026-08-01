@@ -22,14 +22,14 @@
         .warn-line { margin: 10px 0; color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; word-break: break-all; font-size: 0.85rem; }
         .agent-line { margin: 10px 0; color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #8ab4f8; white-space: pre-wrap; line-height: 1.4; font-size: 0.95rem; }
         
-        .config-box { margin-bottom: 12px; }
+        .config-box { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
         input[type="password"], input[type="text"] { width: 100%; padding: 12px; background: #22222e; color: #fff; border: 1px solid #3a3a4c; border-radius: 8px; outline: none; box-sizing: border-box; font-size: 0.9rem; }
         .msg-box { display: flex; gap: 8px; width: 100%; }
         .btn-send { padding: 12px 20px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
     </style>
 </head>
 <body>
-    <h2>🤖 JARVIS CORE (SMART ROUTER)</h2>
+    <h2>🤖 JARVIS CORE (AUTONOMOUS)</h2>
     
     <div class="dashboard">
         <div class="stat-group">
@@ -42,9 +42,10 @@
 
     <div class="config-box">
         <input type="password" id="apiKey" placeholder="Gemini API-Key eintragen..." onchange="localStorage.setItem('jarvis_gemini_key', this.value.trim())">
+        <input type="password" id="ghToken" placeholder="GitHub Personal Access Token eintragen..." onchange="localStorage.setItem('jarvis_gh_token', this.value.trim())">
     </div>
 
-    <div id="chat"><div class="system-line">JARVIS Core online. Smart-Router aktiv – bereit für Befehle...</div></div>
+    <div id="chat"><div class="system-line">JARVIS Core online. GitHub-Schnittstelle bereit...</div></div>
     
     <div class="msg-box">
         <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
@@ -53,6 +54,7 @@
 
     <script>
         document.getElementById('apiKey').value = localStorage.getItem('jarvis_gemini_key') || '';
+        document.getElementById('ghToken').value = localStorage.getItem('jarvis_gh_token') || '';
         
         let todayStr = new Date().toISOString().slice(0, 10);
         let savedDate = localStorage.getItem('jarvis_date');
@@ -91,7 +93,6 @@
             return duplicates.length >= 2;
         }
 
-        // Smart-Router auf die echten, freigeschalteten Account-Modelle umgestellt
         function smartRoute(text) {
             const hasCodeSyntax = /[{};=<>]/g.test(text) && text.length > 25;
             const techTerms = ['code', 'fehler', 'bug', 'script', 'html', 'css', 'js', 'javascript', 'python', 'json', 'github', 'fix', 'funktioniert nicht', 'wieso', 'warum', 'schleife', 'api', 'repository', 'commit', 'anleitung', 'erkläre', 'optimier', 'schreibe', 'bau', 'system', 'problem'];
@@ -111,7 +112,7 @@
             let msg = msgInput.value.trim();
             let chat = document.getElementById('chat');
 
-            if(!key) { alert('Bitte trage zuerst deinen Gemini API-Key in das obere Feld ein!'); return; }
+            if(!key) { alert('Bitte trage zuerst deinen Gemini API-Key ein!'); return; }
             if(!msg) return;
 
             if(sessionQuota <= 0) {
