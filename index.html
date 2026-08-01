@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS Core - Control Center</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f12; color: #e4e4ed; padding: 20px; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-between; box-sizing: border-box; }
+        h2 { color: #8ab4f8; text-align: center; margin: 0 0 10px 0; font-size: 1.4rem; }
+        
+        .dashboard { background: #181824; border: 1px solid #2a2a38; border-radius: 10px; padding: 10px 15px; margin-bottom: 15px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; font-size: 0.85rem; }
+        .stat-item { color: #aaa; }
+        .stat-val { color: #8ab4f8; font-weight: bold; }
+        .btn-small { padding: 6px 12px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+        
+        #chat { flex-grow: 1; border: 1px solid #2a2a35; padding: 15px; margin-bottom: 15px; overflow-y: auto; background: #16161f; border-radius: 12px; }
+        .user-line { margin: 10px 0; color: #e4e4ed; }
+        .system-line { margin: 10px 0; color: #8ab4f8; font-style: italic; }
+        .warn-line { margin: 10px 0; color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; }
+        .agent-line { margin: 10px 0; color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #8ab4f8; white-space: pre-wrap; line-height: 1.4; }
+        
+        .config-box { margin-bottom: 15px; }
+        input[type="password"], input[type="text"] { width: 100%; padding: 12px; background: #22222e; color: #fff; border: 1px solid #3a3a4c; border-radius: 8px; outline: none; box-sizing: border-box; }
+        .msg-box { display: flex; gap: 10px; width: 100%; }
+        .btn-send { padding: 12px 24px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>🤖 JARVIS CORE</h2>
+    
+    <div class="dashboard">
+        <div class="stat-item">Session-Puffer: <span class="stat-val" id="sessionQuota">100</span> / 100</div>
+        <div class="stat-item">Tages-Verbrauch: <span class="stat-val" id="dailyTotal">0</span> / 1400</div>
+        <button class="btn-small" onclick="releaseQuota(100)">+ 100 Freigeben</button>
+    </div>
+
+    <div class="config-box">
+        <input type="password" id="apiKey" placeholder="Gemini API-Key eintragen..." onchange="localStorage.setItem('jarvis_gemini_key', this.value)">
+    </div>
+
+    <div id="chat"><div class="system-line">JARVIS Core online. Schutzsysteme aktiv...</div></div>
+    
+    <div class="msg-box">
+        <input type="text" id="msg" placeholder="Befehl an JARVIS..." onkeypress="if(event.key === 'Enter') send();">
+        <button class="btn-send" onclick="send()">Senden</button>
+    </div>
+
+    <script>
+        document.getElementById('apiKey').value = localStorage.getItem('jarvis_gemini_key') || '';
+        
+        let sessionQuota = 100;
+        let dailyTotal = parseInt(localStorage.getItem('jarvis_daily_total') || '0');
+        let lastRequests = [];
+
+        document.getElementById('dailyTotal').innerText = dailyTotal;
+
+        function releaseQuota(amount) {
+            sessionQuota += amount;
+            document.getElementById('sessionQuota').innerText = sessionQuota;
+            addSystemMsg(`✅ Extra-Puffer freigegeben (+${amount}). Verfügbar: ${sessionQuota}`);
+        }
+
+        function detectLoop(promptText) {
+            let now = Date.now();
+            // Filtert Anfragen der letzten 30 Sekunden
+            lastRequests = lastRequests.filter(r => (now - r.time) < 30000);
+            let duplicates = lastRequests.filter(r => r.prompt === promptText);
+            
+            lastRequests.push({ prompt: promptText, time: now });
+
+            // Wenn in 30 Sek. 3-mal exakt derselbe Prompt gefeuert wird -> Schleife!
+            return duplicates.length >= 2;
+        }
+
+        async function send() {
+            let key = document.getElementById('apiKey').value.trim();
+            let msgInput = document.getElementById('msg');
+            let msg = msgInput.value.trim();
+            let chat = document.getElementById('chat');
+
+            if(!key) { alert('Bitte zuerst deinen Gemini API-Key eintragen!'); return; }
+            if(!msg) return;
+
+            // 1. Quota Check
+            if(sessionQuota <= 0) {
+                addWarnMsg("⚠️ Session-Limit erreicht! Klicke oben auf '+ 100 Freigeben', um fortzufahren.");
+                return;
+            }
+
+            // 2. Schleifen-Erkennung (Loop Protection)
+            if(detectLoop(msg)) {
+                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert. Ausführung gestoppt, um Tokens zu sparen!");
+                return;
+            }
+
+            chat.innerHTML += '<div class="user-line"><b>Du:</b> ' + escapeHtml(msg) + '</div>';
+            msgInput.value = '';
+            chat.scrollTop = chat.scrollHeight;
+
+            chat.innerHTML += '<div class="system-line" id="loading">➔ JARVIS verarbeitet...</div>';
+            chat.scrollTop = chat.scrollHeight;
+
+            try {
+                // Lade System-Anweisung (instructions.md) aus dem GitHub-Repo
+                let systemPrompt = "Du bist JARVIS, ein autonomer Assistent.";
+                try {
+                    let instructRes = await fetch("instructions.md?t=" + new Date().getTime());
+                    if(instructRes.ok) systemPrompt = await instructRes.text();
+                } catch(e){}
+
+                let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_instruction: { parts: [{ text: systemPrompt }] },
+                        contents: [{ parts: [{ text: msg }] }]
+                    })
+                });
+
+                let data = await response.json();
+                removeLoader();
+
+                if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    let reply = data.candidates[0].content.parts[0].text;
+                    chat.innerHTML += '<div class="agent-line"><b>JARVIS:</b><br>' + escapeHtml(reply) + '</div>';
+                    
+                    // Zähler aktualisieren
+                    sessionQuota--;
+                    dailyTotal++;
+                    document.getElementById('sessionQuota').innerText = sessionQuota;
+                    document.getElementById('dailyTotal').innerText = dailyTotal;
+                    localStorage.setItem('jarvis_daily_total', dailyTotal);
+
+                } else {
+                    addWarnMsg("⚠️ API-Fehler: " + JSON.stringify(data));
+                }
+
+            } catch (err) {
+                removeLoader();
+                addWarnMsg("⚠️ Verbindungsfehler: " + err.message);
+            }
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function removeLoader() {
+            let loader = document.getElementById('loading');
+            if(loader) loader.remove();
+        }
+
+        function addSystemMsg(text) {
+            let chat = document.getElementById('chat');
+            chat.innerHTML += '<div class="system-line">' + text + '</div>';
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function addWarnMsg(text) {
+            let chat = document.getElementById('chat');
+            chat.innerHTML += '<div class="warn-line">' + text + '</div>';
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+    </script>
+</body>
+</html>
