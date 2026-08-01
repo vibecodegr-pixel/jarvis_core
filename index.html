@@ -16,8 +16,18 @@
         .user-line { color: #e4e4ed; background: #22222e; padding: 10px; border-radius: 8px; align-self: flex-end; max-width: 85%; word-break: break-word; }
         .system-line { color: #8ab4f8; font-style: italic; font-size: 0.85rem; text-align: center; }
         .warn-line { color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; word-break: break-all; font-size: 0.85rem; }
-        .agent-line { color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #5cf28e; white-space: pre-wrap; line-height: 1.4; font-size: 0.95rem; width: 100%; box-sizing: border-box; }
+        .agent-line { color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #5cf28e; white-space: pre-wrap; line-height: 1.4; font-size: 0.95rem; width: 100%; box-sizing: border-box; position: relative; }
         
+        /* Diff & Indikator Styling */
+        .diff-indicator { display: inline-flex; align-items: center; justify-content: center; background: #f0ad4e; color: #0f0f12; width: 22px; height: 22px; border-radius: 50%; font-weight: bold; cursor: pointer; margin-left: 8px; font-size: 0.8rem; vertical-align: middle; }
+        .diff-modal { display: none; background: #12121a; border: 1px solid #f0ad4e; padding: 10px; border-radius: 6px; margin-top: 10px; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; color: #f9f9f9; }
+        
+        /* Ladebalken Animation */
+        .loader-container { width: 100%; background: #2a2a38; border-radius: 4px; height: 6px; overflow: hidden; margin-top: 8px; }
+        .loader-bar { width: 100%; background: #5cf28e; height: 100%; animation: indeterminate 1.5s infinite linear; transform-origin: left; }
+        @keyframes indeterminate { 0% { transform: translateX(0) scaleX(0); } 40% { transform: translateX(0) scaleX(0.4); } 100% { transform: translateX(100%) scaleX(0.5); } }
+        .loader-text { font-size: 0.75rem; color: #8ab4f8; margin-top: 4px; font-style: italic; }
+
         .config-box { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
         input[type="password"], input[type="text"] { width: 100%; padding: 12px; background: #22222e; color: #fff; border: 1px solid #3a3a4c; border-radius: 8px; outline: none; box-sizing: border-box; font-size: 0.9rem; }
         .msg-box { display: flex; gap: 8px; width: 100%; }
@@ -51,7 +61,6 @@
         document.getElementById('ghToken').value = localStorage.getItem('jarvis_gh_token') || '';
         document.getElementById('ntfyTopic').value = localStorage.getItem('jarvis_ntfy_topic') || '';
 
-        // Beim Start: Lokalen Chat-Verlauf laden und mit GitHub synchronisieren
         window.onload = async function() {
             loadLocalChat();
             await syncWithGitHubMemory();
@@ -80,18 +89,15 @@
                 if (res.ok) {
                     let history = await res.json();
                     let chat = document.getElementById('chat');
-                    // Wenn der Chat leer ist oder nur die Willkommensnachricht hat, füllen wir mit memory.json auf
                     if (history && history.length > 0) {
                         chat.innerHTML = '<div class="system-line">Verlauf mit Cloud synchronisiert.</div>';
                         history.forEach(item => {
                             appendMessage('user', item.cmd, false);
-                            appendMessage('agent', item.ans, false);
+                            appendMessage('agent', item.ans, false, item.diff);
                         });
                     }
                 }
-            } catch (e) {
-                // Stumm bleiben, falls Offline oder Token fehlt
-            }
+            } catch (e) {}
         }
 
         function loadLocalChat() {
@@ -106,7 +112,7 @@
             localStorage.setItem('jarvis_chat_history', chatHTML);
         }
 
-        function appendMessage(type, text, save = true) {
+        function appendMessage(type, text, save = true, diffData = null) {
             let chat = document.getElementById('chat');
             let div = document.createElement('div');
             
@@ -115,7 +121,13 @@
                 div.innerHTML = '<b>Du:</b> ' + escapeHtml(text);
             } else if (type === 'agent') {
                 div.className = 'agent-line';
-                div.innerHTML = '<b>JARVIS:</b><br>' + escapeHtml(text);
+                let html = '<b>JARVIS:</b><br>' + escapeHtml(text);
+                
+                if (diffData) {
+                    html += ` <span class="diff-indicator" title="Änderungen prüfen" onclick="toggleDiff(this)">Δ</span>`;
+                    html += `<div class="diff-modal"><b>Geplante Änderungen (Diff):</b>\n${escapeHtml(diffData)}\n\n<button onclick="approveDiff(true)" style="background:#5cf28e;border:none;padding:4px 8px;font-weight:bold;cursor:pointer;border-radius:4px;">Bestätigen</button> <button onclick="approveDiff(false)" style="background:#ff6b6b;border:none;padding:4px 8px;font-weight:bold;cursor:pointer;border-radius:4px;color:#fff;">Ablehnen</button></div>`;
+                }
+                div.innerHTML = html;
             } else if (type === 'system') {
                 div.className = 'system-line';
                 div.innerHTML = text;
@@ -127,6 +139,20 @@
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
             if (save) saveLocalChat();
+        }
+
+        function toggleDiff(el) {
+            let modal = el.nextElementSibling;
+            modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function approveDiff(accepted) {
+            if (accepted) {
+                document.getElementById('msg').value = "Diff bestätigt. Führe die Änderung aus.";
+                triggerJarvisAgent();
+            } else {
+                appendMessage('system', '❌ Änderung abgelehnt.');
+            }
         }
 
         async function triggerJarvisAgent() {
@@ -145,7 +171,12 @@
             appendMessage('user', commandText);
             msgInput.value = '';
 
-            appendMessage('system', 'Läuft. Der Agent schraubt im Hintergrund daran – gleich klingelt das Handy mit dem Update.');
+            let chat = document.getElementById('chat');
+            let loadDiv = document.createElement('div');
+            loadDiv.className = 'agent-line';
+            loadDiv.innerHTML = `<b>JARVIS arbeitet...</b><div class="loader-text">Analysiere Befehl & bereite Aktion vor...</div><div class="loader-container"><div class="loader-bar"></div></div>`;
+            chat.appendChild(loadDiv);
+            chat.scrollTop = chat.scrollHeight;
 
             try {
                 let response = await fetch(`https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/actions/workflows/jarvis-agent.yml/dispatches`, {
@@ -163,11 +194,15 @@
                     })
                 });
 
-                if (!response.ok) {
+                loadDiv.remove();
+                if (response.ok) {
+                    appendMessage('system', 'Läuft. Der Agent schraubt im Hintergrund daran – gleich klingelt das Handy mit dem Update.');
+                } else {
                     let errJson = await response.json();
                     appendMessage('warn', '⚠️ Fehler beim Starten: ' + (errJson.message || response.statusText));
                 }
             } catch (error) {
+                loadDiv.remove();
                 appendMessage('warn', '⚠️ Netzwerkfehler: ' + error.message);
             }
         }
