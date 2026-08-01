@@ -62,14 +62,31 @@
 
         function detectLoop(promptText) {
             let now = Date.now();
-            // Filtert Anfragen der letzten 30 Sekunden
             lastRequests = lastRequests.filter(r => (now - r.time) < 30000);
             let duplicates = lastRequests.filter(r => r.prompt === promptText);
-            
             lastRequests.push({ prompt: promptText, time: now });
-
-            // Wenn in 30 Sek. 3-mal exakt derselbe Prompt gefeuert wird -> Schleife!
             return duplicates.length >= 2;
+        }
+
+        // Ermittelt dynamisch das neueste verfügbare Gemini-Modell aus der Google API
+        async function getBestModel(key) {
+            try {
+                let res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+                let data = await res.json();
+                if (data.models && data.models.length > 0) {
+                    // Filtert nach Modellen, die Text generieren können
+                    let validModels = data.models.filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"));
+                    // Bevorzuge Flash oder Pro, sonst das erste verfügbare
+                    let flash = validModels.find(m => m.name.includes("flash"));
+                    if (flash) return flash.name;
+                    let pro = validModels.find(m => m.name.includes("pro"));
+                    if (pro) return pro.name;
+                    return validModels[0].name;
+                }
+            } catch (e) {
+                console.error("Konnte Modellliste nicht laden, nutze Standard-Fallback", e);
+            }
+            return "models/gemini-1.5-flash"; // Fallback
         }
 
         async function send() {
@@ -81,15 +98,13 @@
             if(!key) { alert('Bitte zuerst deinen Gemini API-Key eintragen!'); return; }
             if(!msg) return;
 
-            // 1. Quota Check
             if(sessionQuota <= 0) {
                 addWarnMsg("⚠️ Session-Limit erreicht! Klicke oben auf '+ 100 Freigeben', um fortzufahren.");
                 return;
             }
 
-            // 2. Schleifen-Erkennung (Loop Protection)
             if(detectLoop(msg)) {
-                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert. Ausführung gestoppt, um Tokens zu sparen!");
+                addWarnMsg("🚨 SCHLEIFE ERKANNT: Derselbe Befehl wurde mehrfach in 30s gefeuert. Ausführung gestoppt.");
                 return;
             }
 
@@ -97,19 +112,21 @@
             msgInput.value = '';
             chat.scrollTop = chat.scrollHeight;
 
-            chat.innerHTML += '<div class="system-line" id="loading">➔ JARVIS verarbeitet...</div>';
+            chat.innerHTML += '<div class="system-line" id="loading">➔ Ermittle Modell & verarbeite...</div>';
             chat.scrollTop = chat.scrollHeight;
 
+            // System-Instruction laden
+            let systemPrompt = "Du bist JARVIS, ein autonomer Assistent.";
             try {
-                // Lade System-Anweisung (instructions.md) aus dem GitHub-Repo
-                let systemPrompt = "Du bist JARVIS, ein autonomer Assistent.";
-                try {
-                    let instructRes = await fetch("instructions.md?t=" + new Date().getTime());
-                    if(instructRes.ok) systemPrompt = await instructRes.text();
-                } catch(e){}
+                let instructRes = await fetch("instructions.md?t=" + new Date().getTime());
+                if(instructRes.ok) systemPrompt = await instructRes.text();
+            } catch(e){}
 
-                let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`, {
+            try {
+                // Dynamisch das beste Modell von Google holen
+                let modelPath = await getBestModel(key);
 
+                let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${key}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -125,21 +142,19 @@
                     let reply = data.candidates[0].content.parts[0].text;
                     chat.innerHTML += '<div class="agent-line"><b>JARVIS:</b><br>' + escapeHtml(reply) + '</div>';
                     
-                    // Zähler aktualisieren
                     sessionQuota--;
                     dailyTotal++;
                     document.getElementById('sessionQuota').innerText = sessionQuota;
                     document.getElementById('dailyTotal').innerText = dailyTotal;
                     localStorage.setItem('jarvis_daily_total', dailyTotal);
-
                 } else {
                     addWarnMsg("⚠️ API-Fehler: " + JSON.stringify(data));
                 }
-
             } catch (err) {
                 removeLoader();
                 addWarnMsg("⚠️ Verbindungsfehler: " + err.message);
             }
+
             chat.scrollTop = chat.scrollHeight;
         }
 
