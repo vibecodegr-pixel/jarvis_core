@@ -53,20 +53,6 @@
     </div>
 
     <script>
-        // Session-Puffer: Startet bei 100 und zählt bei jeder Aktion 1 runter
-        let sessionBuffer = 100;
-
-        function checkBuffer() {
-            if (sessionBuffer <= 0) {
-                    alert("Puffer leer! Bitte klicke auf den +100 Puffer Button.");
-                            return false;
-                                }
-                                    sessionBuffer--;
-                                        const display = document.getElementById('session-buffer-counter');
-                                            if (display) display.innerText = sessionBuffer;
-                                                return true;
-                                                }
-
         document.getElementById('apiKey').value = localStorage.getItem('jarvis_gemini_key') || '';
         document.getElementById('ghToken').value = localStorage.getItem('jarvis_gh_token') || '';
         document.getElementById('modelName').value = localStorage.getItem('jarvis_model_name') || 'gemini-3.5-flash';
@@ -96,13 +82,6 @@
             updateDisplay();
             addSystemMsg(`✅ Session-Puffer um +${amount} erhöht. (Verfügbar: ${sessionQuota})`);
         }
-document.addEventListener('click', (e) => {
-    if (e.target && e.target.innerText.includes('100 Puffer')) {
-            sessionQuota += 100;
-                    const display = document.getElementById('session-buffer-counter');
-                            if (display) display.innerText = sessionBuffer;
-                                }
-                                });
 
         function detectLoop(promptText) {
             let now = Date.now();
@@ -304,6 +283,18 @@ document.addEventListener('click', (e) => {
                     let data = await response.json();
                     if (!response.ok) {
                         let errMessage = data.error ? data.error.message : JSON.stringify(data);
+                        
+                        // Automatische Retry-Logik bei Google Rate-Limit
+                        let match = errMessage.match(/Please retry in ([0-9.]+)s/);
+                        if (match) {
+                            let waitSec = parseFloat(match[1]);
+                            let waitMs = Math.ceil(waitSec * 1000) + 1000;
+                            addWarnMsg(`⏳ Free-Tier Limit erreicht. Warte ${Math.ceil(waitSec)}s und versuche es automatisch erneut...`);
+                            await new Promise(resolve => setTimeout(resolve, waitMs));
+                            step--;
+                            continue;
+                        }
+
                         addWarnMsg(`⚠️ API-Fehler (${modelName}): ` + errMessage);
                         break;
                     }
