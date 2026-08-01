@@ -178,7 +178,6 @@
                 });
 
                 if (putRes.ok) {
-                    await sendNtfyNotification(`🚀 JARVIS Update erfolgreich: ${path}`);
                     return { status: "success", message: `Datei ${path} erfolgreich auf GitHub aktualisiert.` };
                 } else {
                     let errJson = await putRes.json();
