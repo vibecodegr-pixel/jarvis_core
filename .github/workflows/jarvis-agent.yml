@@ -49,15 +49,21 @@ jobs:
           answer = ''
 
           try:
-              # Nutzt den offiziellen Client mit standardisiertem HF-Inference-Provider
-              client = InferenceClient(provider='hf-inference', api_key=token)
-              
-              response = client.text_generation(
-                  model='NousResearch/Hermes-3-Llama-3.1-8B-Instruct',
-                  prompt=f'Du bist JARVIS, ein autonomer Software-Agent. Führe folgenden Befehl aus und antworte präzise: {command}',
-                  max_new_tokens=400
+              client = InferenceClient(
+                  model='Qwen/Qwen2.5-7B-Instruct',
+                  token=token
               )
-              answer = response
+              
+              response = client.chat.completions.create(
+                  messages=[
+                      {
+                          'role': 'user', 
+                          'content': f'Du bist JARVIS, ein autonomer Software-Agent. Führe folgenden Befehl aus und antworte präzise und kurz: {command}'
+                      }
+                  ],
+                  max_tokens=400
+              )
+              answer = response.choices[0].message.content
 
           except Exception as e:
               status = 'FEHLER'
