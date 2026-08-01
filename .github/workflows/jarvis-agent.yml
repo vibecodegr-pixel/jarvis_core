@@ -80,6 +80,7 @@ jobs:
 
           status = 'ERFOLG'
           answer = ''
+          diff_data = ''
 
           try:
               client = InferenceClient(
@@ -87,23 +88,48 @@ jobs:
                   token=token
               )
               
-              system_prompt = f'Du bist JARVIS, ein autonomer Software-Agent mit Langzeitgedächtnis. Führe folgenden Befehl aus und antworte präzise und kurz.{context_str}'
+              system_prompt = (
+                  'Du bist JARVIS, ein autonomer Software-Agent mit Langzeitgedächtnis. '
+                  'Führe den Befehl des Benutzers aus. '
+                  'Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Markdown-Wrapper:\n'
+                  '{\n  \"ans\": \"Kurze, natürliche Antwort für den Chat\",\n'
+                  '  \"diff\": \"Hier genaue Code-Änderungen oder betroffenen Dateien im Diff-Format auflisten, falls Code geändert wird. Leer lassen, wenn keine Code-Änderung nötig ist.\"\n'
+                  f'}}{context_str}'
+              )
 
               response = client.chat.completions.create(
                   messages=[
                       {'role': 'system', 'content': system_prompt},
                       {'role': 'user', 'content': command}
                   ],
-                  max_tokens=400
+                  max_tokens=600
               )
-              answer = response.choices[0].message.content
+              raw_content = response.choices[0].message.content.strip()
+              
+              # JSON Bereinigung falls Markdown-Wrapper vorhanden sind
+              clean_content = raw_content
+              if clean_content.startswith('```json'):
+                  clean_content = clean_content[7:]
+              if clean_content.startswith('```'):
+                  clean_content = clean_content[3:]
+              if clean_content.endswith('```'):
+                  clean_content = clean_content[:-3]
+              clean_content = clean_content.strip()
+
+              try:
+                  parsed = json.loads(clean_content)
+                  answer = parsed.get('ans', raw_content)
+                  diff_data = parsed.get('diff', '')
+              except Exception as json_err:
+                  answer = raw_content
+                  diff_data = ''
 
               # Token-Verbrauch grob schätzen und addieren
               used_tokens = len(command.split()) + len(answer.split())
               quota_data['total_tokens'] = quota_data.get('total_tokens', 0) + used_tokens
 
-              # Gedächtnis aktualisieren
-              history.append({'cmd': command, 'ans': answer})
+              # Gedächtnis aktualisieren (inklusive Diff für die UI-Bestätigung)
+              history.append({'cmd': command, 'ans': answer, 'diff': diff_data})
               history = history[-15:]
               with open(memory_file, 'w', encoding='utf-8') as f:
                   json.dump(history, f, ensure_ascii=False, indent=2)
@@ -115,13 +141,14 @@ jobs:
           except Exception as e:
               status = 'FEHLER'
               answer = str(e)
+              diff_data = ''
               print(f'Fehler aufgetreten: {e}')
 
           duration = round(time.time() - start_time, 2)
           print(f'[Tracking] Beendet. Status: {status} | Dauer: {duration}s')
 
-          # Nachricht für Handy vorbereiten (inkl. Quota-Info)
-          notif_text = f'🤖 JARVIS [{status}] ({duration}s)\nBefehl: {command}\nAntwort: {answer[:150]}...\n📊 Cloud-Lauf #{quota_data[\"cloud_runs\"]}'
+          # Kurze, knackige Push-Nachricht im coolen Vibe für das Handy
+          notif_text = f'🤖 JARVIS [{status}] • Lauf #{quota_data[\"cloud_runs\"]} ({duration}s)\n{answer[:100]}'
           with open('/tmp/jarvis_notif.txt', 'w', encoding='utf-8') as f:
               f.write(notif_text)
           "
@@ -131,11 +158,11 @@ jobs:
           git config --global user.name 'JARVIS Cloud Agent'
           git config --global user.email 'agent@jarvis.local'
           git add memory.json quota.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Gedächtnis & Quota aktualisiert' && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Gedächtnis & Quota mit Diff aktualisiert' && git push)
 
       - name: Benachrichtigung senden (nach Git-Push)
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
           TOPIC="${NTFY_TOPIC:-jarvis-status-GR-998877}"
-          curl -s -X POST "https://ntfy.sh/$TOPIC" --data-binary "@/tmp/jarvis_notif.txt"
+          curl -s -X POST "[https://ntfy.sh/$TOPIC](https://ntfy.sh/$TOPIC)" --data-binary "@/tmp/jarvis_notif.txt"
