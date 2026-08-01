@@ -58,9 +58,9 @@
     <!-- Snapshot Modal Popup -->
     <div id="snapshotModalOverlay">
         <div class="snapshot-modal-content">
-            <h3 style="color: #f0ad4e; margin: 0 0 10px 0; font-size: 1.1rem;">Projekt-Snapshot (Delta-Vorschau)</h3>
-            <div style="font-size: 0.8rem; color: #aaa;">Prüfe den Inhalt vor dem Export. Beim Export wird der aktuelle Stand heruntergeladen und der Zyklus für den nächsten Snapshot zurückgesetzt.</div>
-            <div id="snapshotContentArea" class="snapshot-scroll-area">Lade Delta-Daten aus dem Repository...</div>
+            <h3 style="color: #f0ad4e; margin: 0 0 10px 0; font-size: 1.1rem;">Projekt-Snapshot (Zusammenfassung)</h3>
+            <div style="font-size: 0.8rem; color: #aaa;">Prüfe den Bericht von JARVIS vor dem Export. Beim Export wird die Datei heruntergeladen und der Zyklus zurückgesetzt.</div>
+            <div id="snapshotContentArea" class="snapshot-scroll-area">Lade intelligenten Snapshot von JARVIS...</div>
             <div class="modal-buttons">
                 <button class="btn-modal-cancel" onclick="closeSnapshotPopup()">Abbrechen</button>
                 <button class="btn-modal-export" onclick="executeSnapshotExport()">Export & Reset</button>
@@ -104,32 +104,59 @@
             appendMessage('system', '📦 Full-Repo ZIP-Download gestartet.');
         }
 
-        // --- Snapshot Popup Logic ---
+        // --- Snapshot Popup Logic (Gesteuert durch JARVIS im Backend) ---
         async function openSnapshotPopup() {
             let modal = document.getElementById('snapshotModalOverlay');
             let contentArea = document.getElementById('snapshotContentArea');
             modal.style.display = 'flex';
-            contentArea.innerText = 'Lade aktuellen Projekt-Stand & Delta...';
+            contentArea.innerText = 'JARVIS erstellt den intelligenten Snapshot im Hintergrund...';
 
             let repoInfo = getRepoInfo();
+            let token = document.getElementById('ghToken').value.trim() || localStorage.getItem('jarvis_gh_token');
+
+            if (!token) {
+                contentArea.innerText = "Fehler: Bitte zuerst den GitHub Personal Access Token eintragen.";
+                return;
+            }
+
             try {
-                let res = await fetch(`https://raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/memory.json?t=` + Date.now());
-                if (res.ok) {
-                    let history = await res.json();
-                    let deltaText = "# Projekt-Snapshot (Delta-Ansicht)\n\n### Letzte Aktivitäten seit dem letzten Snapshot:\n";
-                    if (history && history.length > 0) {
-                        history.slice(-10).forEach(item => {
-                            deltaText += `- **Befehl:** ${item.cmd}\n  **Antwort:** ${item.ans.substring(0, 120)}...\n\n`;
-                        });
-                    } else {
-                        deltaText += "Keine neuen Einträge im Gedächtnis gefunden.\n";
-                    }
-                    contentArea.innerText = deltaText;
-                } else {
-                    contentArea.innerText = "Fehler beim Laden der Repository-Daten.";
+                // 1. JARVIS anstoßen, damit er project_snapshot.md frisch generiert
+                let triggerRes = await fetch(`https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/actions/workflows/jarvis-agent.yml/dispatches`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ref: 'main', inputs: { command: 'Erstelle den intelligenten Projekt-Snapshot' } })
+                });
+
+                if (!triggerRes.ok) {
+                    contentArea.innerText = "Fehler beim Starten von JARVIS für den Snapshot.";
+                    return;
                 }
+
+                contentArea.innerText = 'JARVIS generiert die Zusammenfassung (warte kurz auf Fertigstellung)...';
+
+                // 2. Kurz warten und dann die fertig generierte project_snapshot.md aus dem Repo laden
+                let fetched = false;
+                for (let i = 0; i < 6; i++) {
+                    await new Promise(r => setTimeout(r, 3500));
+                    let res = await fetch(`https://raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/project_snapshot.md?t=` + Date.now());
+                    if (res.ok) {
+                        let text = await res.text();
+                        contentArea.innerText = text;
+                        fetched = true;
+                        break;
+                    }
+                }
+
+                if (!fetched) {
+                    contentArea.innerText = "Snapshot konnte noch nicht geladen werden. Bitte schließe das Popup und versuche es in ein paar Sekunden erneut.";
+                }
+
             } catch (err) {
-                contentArea.innerText = "Netzwerkfehler beim Abrufen des Snapshots: " + err.message;
+                contentArea.innerText = "Netzwerkfehler: " + err.message;
             }
         }
 
@@ -152,13 +179,13 @@
             URL.revokeObjectURL(url);
 
             closeSnapshotPopup();
-            appendMessage('system', '📸 Snapshot erfolgreich exportiert und heruntergeladen. Zyklus zurückgesetzt.');
+            appendMessage('system', '📸 Snapshot erfolgreich exportiert. Setze den Zyklus in der Cloud zurück...');
 
-            // Optional: Befehl an JARVIS senden, um den Cleanup/Metadaten-Reset im Repo anzustoßen
-            document.getElementById('msg').value = "Snapshot Export abgeschlossen. Setze den Snapshot-Zeitstempel in der Meta-Datei neu und bereinige den alten Delta-Puffer.";
+            // JARVIS anweisen, den Reset-Zyklus in der Meta-Datei auszuführen
+            document.getElementById('msg').value = "Snapshot Export abgeschlossen. Setze den Zyklus zurück.";
             triggerJarvisAgent();
         }
-        // ----------------------------
+        // ------------------------------------------------------------
 
         async function syncWithGitHubMemory() {
             let repoInfo = getRepoInfo();
