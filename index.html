@@ -104,12 +104,12 @@
             appendMessage('system', '📦 Full-Repo ZIP-Download gestartet.');
         }
 
-        // --- Snapshot Popup Logic (Gesteuert durch JARVIS im Backend) ---
+        // --- Snapshot Popup Logic ---
         async function openSnapshotPopup() {
             let modal = document.getElementById('snapshotModalOverlay');
             let contentArea = document.getElementById('snapshotContentArea');
             modal.style.display = 'flex';
-            contentArea.innerText = 'JARVIS erstellt den intelligenten Snapshot im Hintergrund...';
+            contentArea.innerText = 'JARVIS erstellt den intelligenten Snapshot im Hintergrund... (Das dauert ca. 10–15 Sekunden)';
 
             let repoInfo = getRepoInfo();
             let token = document.getElementById('ghToken').value.trim() || localStorage.getItem('jarvis_gh_token');
@@ -120,7 +120,6 @@
             }
 
             try {
-                // 1. JARVIS anstoßen, damit er project_snapshot.md frisch generiert
                 let triggerRes = await fetch(`https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/actions/workflows/jarvis-agent.yml/dispatches`, {
                     method: 'POST',
                     headers: {
@@ -132,27 +131,33 @@
                 });
 
                 if (!triggerRes.ok) {
-                    contentArea.innerText = "Fehler beim Starten von JARVIS für den Snapshot.";
+                    contentArea.innerText = "Fehler beim Starten von JARVIS.";
                     return;
                 }
 
-                contentArea.innerText = 'JARVIS generiert die Zusammenfassung (warte kurz auf Fertigstellung)...';
-
-                // 2. Kurz warten und dann die fertig generierte project_snapshot.md aus dem Repo laden
                 let fetched = false;
-                for (let i = 0; i < 6; i++) {
-                    await new Promise(r => setTimeout(r, 3500));
-                    let res = await fetch(`https://raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/project_snapshot.md?t=` + Date.now());
-                    if (res.ok) {
-                        let text = await res.text();
-                        contentArea.innerText = text;
+                for (let i = 0; i < 8; i++) {
+                    await new Promise(r => setTimeout(r, 4000));
+                    contentArea.innerText = `Warte auf JARVIS (Versuch ${i+1}/8)...`;
+
+                    let apiRes = await fetch(`https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/contents/project_snapshot.md`, {
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    });
+
+                    if (apiRes.ok) {
+                        let fileJson = await apiRes.json();
+                        let decodedText = decodeURIComponent(escape(atob(fileJson.content)));
+                        contentArea.innerText = decodedText;
                         fetched = true;
                         break;
                     }
                 }
 
                 if (!fetched) {
-                    contentArea.innerText = "Snapshot konnte noch nicht geladen werden. Bitte schließe das Popup und versuche es in ein paar Sekunden erneut.";
+                    contentArea.innerText = "Der Snapshot braucht noch einen Moment. Schließe das Popup kurz und öffne es gleich nochmal.";
                 }
 
             } catch (err) {
@@ -167,7 +172,6 @@
         function executeSnapshotExport() {
             let contentText = document.getElementById('snapshotContentArea').innerText;
             
-            // Download als .md Datei initiieren
             let blob = new Blob([contentText], { type: 'text/markdown;charset=utf-8;' });
             let url = URL.createObjectURL(blob);
             let a = document.createElement('a');
@@ -181,11 +185,10 @@
             closeSnapshotPopup();
             appendMessage('system', '📸 Snapshot erfolgreich exportiert. Setze den Zyklus in der Cloud zurück...');
 
-            // JARVIS anweisen, den Reset-Zyklus in der Meta-Datei auszuführen
             document.getElementById('msg').value = "Snapshot Export abgeschlossen. Setze den Zyklus zurück.";
             triggerJarvisAgent();
         }
-        // ------------------------------------------------------------
+        // ----------------------------
 
         async function syncWithGitHubMemory() {
             let repoInfo = getRepoInfo();
@@ -277,7 +280,8 @@
             let chat = document.getElementById('chat');
             let loadDiv = document.createElement('div');
             loadDiv.className = 'agent-line';
-            loadDiv.innerHTML = `<b>JARVIS arbeitet...</b><div class="loader-text">Analysiere Befehl & bereite Aktion vor...</div><div class="loader-container"><div class="loader-bar"></div></div>`;
+            loadDiv.id = 'activeLoader';
+            loadDiv.innerHTML = `<b>JARVIS arbeitet...</b><div class="loader-text">Agent führt Befehl in der Cloud aus (warte auf Abschluss)...</div><div class="loader-container"><div class="loader-bar"></div></div>`;
             chat.appendChild(loadDiv);
             chat.scrollTop = chat.scrollHeight;
 
@@ -295,13 +299,41 @@
                     })
                 });
 
-                loadDiv.remove();
-                if (response.ok) {
-                    appendMessage('system', 'Läuft. Der Agent schraubt im Hintergrund daran – gleich klingelt das Handy mit dem Update.');
-                } else {
+                if (!response.ok) {
+                    loadDiv.remove();
                     let errJson = await response.json();
                     appendMessage('warn', '⚠️ Fehler beim Starten: ' + (errJson.message || response.statusText));
+                    return;
                 }
+
+                let checkAttempts = 0;
+                let maxAttempts = 15;
+
+                let pollInterval = setInterval(async () => {
+                    checkAttempts++;
+                    try {
+                        let memRes = await fetch(`https://raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/memory.json?t=` + Date.now());
+                        if (memRes.ok) {
+                            let history = await memRes.json();
+                            if (history.length > 0) {
+                                let lastItem = history[history.length - 1];
+                                if (lastItem.cmd === commandText) {
+                                    clearInterval(pollInterval);
+                                    loadDiv.remove();
+                                    appendMessage('agent', lastItem.ans, true, lastItem.diff);
+                                    return;
+                                }
+                            }
+                        }
+                    } catch(e) {}
+
+                    if (checkAttempts >= maxAttempts) {
+                        clearInterval(pollInterval);
+                        loadDiv.remove();
+                        appendMessage('system', '⏳ Dauerte etwas länger. Bitte Seite kurz aktualisieren – das Handy-Update via ntfy.sh sollte gleich kommen.');
+                    }
+                }, 4000);
+
             } catch (error) {
                 loadDiv.remove();
                 appendMessage('warn', '⚠️ Netzwerkfehler: ' + error.message);
