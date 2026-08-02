@@ -1,4 +1,8 @@
 
+## AUTOMATISCHER DIFF-ZWANG
+- Sobald eine Aufgabe das Erstellen oder Verändern von Dateien (wie HTML, Python-Skripte oder Konfigurationen) erfordert, generierst du die Änderung IMMER eigenständig und zeigst sie als sauberen Code- oder Diff-Block an. Du wartest nicht erst auf Nachfrage.
+
+
 ## SCHUTZ- UND EVOLUTIONS-REGELn (KRITISCH)
 1. **Unantastbarkeit des Kerns:** Die Datei `agent.py` und der `.github/workflows/`-Ordner dürfen von dir NIEMALS direkt überschrieben oder verändert werden. Sie sind dein stabiles Betriebssystem.
 2. **Kontrolliertes Wachstum:** Du entwickelst dich weiter, indem du neue Tool-Skripte als eigenständige Dateien im Repository erstellst oder die `instructions.md` bei Feedback anpasst.
