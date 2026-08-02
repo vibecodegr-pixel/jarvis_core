@@ -42,6 +42,7 @@ jobs:
           import os
           import time
           import json
+          import re
           from datetime import datetime
           from huggingface_hub import InferenceClient
 
@@ -72,7 +73,6 @@ jobs:
               except:
                   history = []
 
-          # Snapshot-Logik prüfen, falls Befehl nach Snapshot verlangt
           is_snapshot_req = 'snapshot' in command.lower()
           is_reset_req = 'reset' in command.lower() or 'export abgeschlossen' in command.lower()
 
@@ -86,12 +86,6 @@ jobs:
               except:
                   pass
 
-          context_str = ''
-          if history:
-              context_str = '\n\nBisheriges Gedächtnis:\n' + '\n'.join(
-                  [f'- User: {item[\"cmd\"]} | JARVIS: {item[\"ans\"][:100]}' for item in history[-10:]]
-              )
-
           status = 'ERFOLG'
           answer = ''
           diff_data = ''
@@ -103,24 +97,20 @@ jobs:
               )
               
               if is_snapshot_req:
-                  # Prompt speziell für den intelligenten Projekt-Snapshot
                   system_prompt = (
                       'Du bist JARVIS. Erstelle einen professionellen, flüssig lesbaren Projekt-Snapshot '
-                      'im Markdown-Format basierend auf der Historie seit dem letzten Zeitpunkt (' + last_snapshot_time + ').\n'
-                      'Strukturiere den Bericht in:\n'
-                      '1. Zusammenfassung der wichtigsten Änderungen (was wurde neu erstellt, geprüft oder eingebunden).\n'
-                      '2. Neue Dinge/Erkenntnisse (mit Details).\n'
-                      '3. Gelöschte oder bereinigte Elemente.\n'
-                      'Antworte im JSON-Format:\n'
-                      '{\n  \"ans\": \"Kurze Bestätigung für den Chat\",\n'
-                      '  \"snapshot_content\": \"Der vollständige, strukturierte Markdown-Text für die project_snapshot.md\"\n}'
+                      'im Markdown-Format basierend auf der Historie seit (' + last_snapshot_time + ').\n'
+                      'Strukturiere den Bericht in: 1. Zusammenfassung, 2. Neue Tools/Erkenntnisse, 3. Bereinigungen.\n'
+                      'Antworte AUSSCHLIESSLICH als JSON:\n'
+                      '{\n  \"ans\": \"Kurze Bestätigung\",\n'
+                      '  \"snapshot_content\": \"Vollständiger Markdown-Text\"\n}'
                   )
               else:
                   system_prompt = (
                       'Du bist JARVIS, ein autonomer Software-Agent. Führe den Befehl aus.\n'
-                      'Antworte AUSSCHLIESSLICH im JSON-Format:\n'
-                      '{\n  \"ans\": \"Kurze, natürliche Antwort für den Chat\",\n'
-                      '  \"diff\": \"Geplante Code-Änderungen im Diff-Format, falls nötig. Sonst leer.\"\n}'
+                      'Antworte AUSSCHLIESSLICH im JSON-Format mit exakt diesen Schlüsseln:\n'
+                      '{\n  \"ans\": \"Deine Antwort für den Chat\",\n'
+                      '  \"diff\": \"Exakter Code-Diff falls Code geändert wird, sonst leerer String\"\n}'
                   )
 
               response = client.chat.completions.create(
@@ -132,33 +122,34 @@ jobs:
               )
               raw_content = response.choices[0].message.content.strip()
               
-              # JSON Bereinigung
-              if raw_content.startswith('```json'): raw_content = raw_content[7:]
-              if raw_content.startswith('```'): raw_content = raw_content[3:]
-              if raw_content.endswith('```'): raw_content = raw_content[:-3]
-              raw_content = raw_content.strip()
-
-              parsed = json.loads(raw_content)
-              answer = parsed.get('ans', 'Aktion ausgeführt.')
-              diff_data = parsed.get('diff', '')
+              # Robuste JSON-Extraktion per Regex (ignoriert Text-Reste des Modells)
+              json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
+              if json_match:
+                  try:
+                      parsed = json.loads(json_match.group(0))
+                      answer = parsed.get('ans', raw_content)
+                      diff_data = parsed.get('diff', '')
+                  except Exception:
+                      answer = raw_content
+                      diff_data = ''
+              else:
+                  answer = raw_content
+                  diff_data = ''
 
               if is_snapshot_req:
-                  snapshot_text = parsed.get('snapshot_content', '# Projekt-Snapshot\n\nKeine Details verfügbar.')
+                  snapshot_text = parsed.get('snapshot_content', '# Projekt-Snapshot\n\nKeine Details verfügbar.') if 'parsed' in locals() else '# Fehler'
                   with open('project_snapshot.md', 'w', encoding='utf-8') as f:
                       f.write(snapshot_text)
                   diff_data = 'project_snapshot.md aktualisiert.'
 
               if is_reset_req:
-                  # Meta-Zeitstempel aktualisieren (Zyklus-Reset)
                   now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                   with open(snapshot_meta_file, 'w', encoding='utf-8') as f:
                       json.dump({'last_timestamp': now_str}, f, ensure_ascii=False, indent=2)
-                  # Optional: project_snapshot.md nach erfolgreichem Export bereinigen
                   if os.path.exists('project_snapshot.md'):
                       os.remove('project_snapshot.md')
                   answer = 'Snapshot-Zyklus erfolgreich zurückgesetzt.'
 
-              # Token & Memory Update
               used_tokens = len(command.split()) + len(answer.split())
               quota_data['total_tokens'] = quota_data.get('total_tokens', 0) + used_tokens
 
@@ -186,7 +177,7 @@ jobs:
           git config --global user.name 'JARVIS Cloud Agent'
           git config --global user.email 'agent@jarvis.local'
           git add memory.json quota.json snapshot_meta.json project_snapshot.md 2>/dev/null || true
-          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Snapshot & Zustand aktualisiert' && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Update' && git push)
 
       - name: Benachrichtigung senden
         env:
