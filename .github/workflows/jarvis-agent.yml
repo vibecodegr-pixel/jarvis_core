@@ -31,104 +31,17 @@ jobs:
       - name: 3. JARVIS Core Engine ausführen
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          EVENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
           DISPATCH_PROMPT: ${{ github.event.client_payload.prompt }}
           MANUAL_PROMPT: ${{ github.event.inputs.prompt }}
-        run: |
-          cat << 'EOF' > agent.py
-          import os, json, time, requests, sys
-          from datetime import datetime, timezone
+        run: python agent.py
 
-          HF_TOKEN = os.environ.get("HF_TOKEN", "")
-          MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
-          API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}/v1/chat/completions"
-
-          # Eingabe ermitteln
-          prompt = os.environ.get("DISPATCH_PROMPT") or os.environ.get("MANUAL_PROMPT") or "Status Check"
-          
-          # Speicher & Instruktionen laden
-          memory_file = "memory.json"
-          instructions_file = "instructions.md"
-
-          try:
-              with open(memory_file, "r", encoding="utf-8") as f:
-                  memory = json.load(f)
-          except Exception:
-              memory = {"history": [], "status": "idle", "last_updated": ""}
-
-          try:
-              with open(instructions_file, "r", encoding="utf-8") as f:
-                  instructions = f.read()
-          except Exception:
-              instructions = "Du bist JARVIS, ein autonomer Agent mit Fähigkeit zur Tool-Erstellung."
-
-          system_prompt = f"""
-          {instructions}
-          
-          WICHTIGE REGELN FÜR AUTONOMIE & DIFF-AUTHORING:
-          1. Wenn du eine Aufgabe löst, die Code, ein neues Tool oder eine Skriptänderung erfordert, gib IMMER einen sauberen Code-Diff im Unified-Diff-Format aus, umschlossen von ```diff ... ```.
-          2. Antworte präzise, lösungsorientiert und professionell auf Deutsch.
-          3. Wenn kein Code geändert werden muss, antworte normal ohne Diff-Block.
-          """
-
-          messages = [{"role": "system", "content": system_prompt}]
-          for entry in memory.get("history", [])[-8:]:
-              messages.append({"role": entry.get("role", "user"), "content": entry.get("content", "")})
-          messages.append({"role": "user", "content": prompt})
-
-          # HF API Call mit Retries
-          headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
-          payload = {
-              "model": MODEL_ID,
-              "messages": messages,
-              "max_tokens": 1500,
-              "temperature": 0.3
-          }
-
-          assistant_reply = "Fehler: Keine Antwort erhalten."
-          status = "success"
-
-          for attempt in range(3):
-              try:
-                  response = requests.post(
-                      API_URL,
-                      headers=headers,
-                      json=payload,
-                      timeout=45
-                  )
-                  if response.status_code == 200:
-                      data = response.json()
-                      assistant_reply = data["choices"][0]["message"]["content"]
-                      status = "success"
-                      break
-                  else:
-                      time.sleep(3)
-              except Exception as e:
-                  assistant_reply = f"Systemfehler bei Inferenz: {str(e)}"
-                  status = "error"
-                  time.sleep(3)
-
-          # History & State aktualisieren (Garantierter Write)
-          memory["history"].append({"role": "user", "content": prompt, "timestamp": datetime.now(timezone.utc).isoformat()})
-          memory["history"].append({"role": "assistant", "content": assistant_reply, "timestamp": datetime.now(timezone.utc).isoformat()})
-          memory["status"] = status
-          memory["last_updated"] = datetime.now(timezone.utc).isoformat()
-
-          with open(memory_file, "w", encoding="utf-8") as f:
-              json.dump(memory, f, indent=2, ensure_ascii=False)
-
-          # Exit-Code 0 garantieren, damit Workflow Commit/Ntfy ausführt
-          sys.exit(0)
-          EOF
-          python agent.py
-
-      - name: 4. Git Commit & Push (Garantierter State-Sync)
+      - name: 4. Git Commit & Push (State Sync)
         if: always()
         run: |
           git config --global user.name "JARVIS Cloud Agent"
           git config --global user.email "jarvis@autonomous.local"
-          git add -A
-          git commit -m "chore(jarvis): update memory & agent state [skip ci]" || echo "No changes to commit"
+          git add memory.json || true
+          git commit -m "chore(jarvis): update memory state [skip ci]" || echo "No changes to commit"
           git pull --rebase origin main || true
           git push origin main || true
 
@@ -140,7 +53,7 @@ jobs:
         run: |
           if [ -n "$NTFY_TOPIC" ]; then
             if [ "$JOB_STATUS" = "success" ]; then
-              msg="JARVIS Lauf abgeschlossen"
+              msg="JARVIS Lauf erfolgreich abgeschlossen"
             else
               msg="JARVIS Lauf mit Status: $JOB_STATUS beendet"
             fi
