@@ -5,343 +5,444 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JARVIS Cloud Control</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f12; color: #e4e4ed; padding: 15px; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-between; box-sizing: border-box; }
-        h2 { color: #8ab4f8; text-align: center; margin: 0 0 10px 0; font-size: 1.3rem; }
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --border: #30363d;
+            --accent: #58a6ff;
+            --accent-hover: #1f6feb;
+            --text: #c9d1d9;
+            --text-muted: #8b949e;
+            --success: #238636;
+            --danger: #da3633;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        header {
+            padding: 1rem 1.5rem;
+            background-color: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo { font-weight: 700; color: var(--accent); letter-spacing: 1px; font-size: 1.1rem; }
+        .status-badge {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 999px;
+            background: var(--border);
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+        .status-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
         
-        .dashboard { background: #181824; border: 1px solid #2a2a38; border-radius: 10px; padding: 10px 15px; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.85rem; }
-        .btn-small { padding: 6px 12px; background: #8ab4f8; color: #0f0f12; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; }
-        .btn-cloud { background: #5cf28e; }
-        .btn-snapshot { background: #f0ad4e; }
-        
-        #chat { flex-grow: 1; border: 1px solid #2a2a35; padding: 15px; margin-bottom: 12px; overflow-y: auto; background: #16161f; border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
-        .user-line { color: #e4e4ed; background: #22222e; padding: 10px; border-radius: 8px; align-self: flex-end; max-width: 85%; word-break: break-word; }
-        .system-line { color: #8ab4f8; font-style: italic; font-size: 0.85rem; text-align: center; }
-        .warn-line { color: #ff6b6b; font-weight: bold; background: #2d1e1e; padding: 10px; border-radius: 8px; word-break: break-all; font-size: 0.85rem; }
-        .agent-line { color: #a8d5ba; background: #1e1e2d; padding: 12px; border-radius: 8px; border-left: 4px solid #5cf28e; white-space: pre-wrap; line-height: 1.4; font-size: 0.95rem; width: 100%; box-sizing: border-box; position: relative; }
-        
-        /* Diff & Indikator Styling */
-        .diff-indicator { display: inline-flex; align-items: center; justify-content: center; background: #f0ad4e; color: #0f0f12; width: 22px; height: 22px; border-radius: 50%; font-weight: bold; cursor: pointer; margin-left: 8px; font-size: 0.8rem; vertical-align: middle; }
-        .diff-modal { display: none; background: #12121a; border: 1px solid #f0ad4e; padding: 10px; border-radius: 6px; margin-top: 10px; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; color: #f9f9f9; }
+        .progress-bar-container {
+            width: 100%;
+            height: 3px;
+            background: transparent;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--accent);
+            transition: width 0.4s ease;
+        }
+        .progress-bar.loading {
+            width: 100%;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.3; }
+            50% { opacity: 1; }
+            100% { opacity: 0.3; }
+        }
 
-        /* Snapshot Popup Modal Styling */
-        #snapshotModalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        .snapshot-modal-content { background: #181824; border: 1px solid #f0ad4e; border-radius: 12px; width: 100%; max-width: 600px; max-height: 85vh; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
-        .snapshot-scroll-area { flex-grow: 1; background: #12121a; border: 1px solid #2a2a38; border-radius: 8px; padding: 15px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; color: #e4e4ed; white-space: pre-wrap; margin: 15px 0; }
-        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; }
-        .btn-modal-export { background: #5cf28e; color: #0f0f12; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .btn-modal-cancel { background: #ff6b6b; color: #fff; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        
-        /* Ladebalken Animation */
-        .loader-container { width: 100%; background: #2a2a38; border-radius: 4px; height: 6px; overflow: hidden; margin-top: 8px; }
-        .loader-bar { width: 100%; background: #5cf28e; height: 100%; animation: indeterminate 1.5s infinite linear; transform-origin: left; }
-        @keyframes indeterminate { 0% { transform: translateX(0) scaleX(0); } 40% { transform: translateX(0) scaleX(0.4); } 100% { transform: translateX(100%) scaleX(0.5); } }
-        .loader-text { font-size: 0.75rem; color: #8ab4f8; margin-top: 4px; font-style: italic; }
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .message {
+            max-width: 80%;
+            padding: 0.85rem 1.1rem;
+            border-radius: 8px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+            position: relative;
+        }
+        .message.user {
+            align-self: flex-end;
+            background-color: var(--accent-hover);
+            color: #fff;
+        }
+        .message.assistant {
+            align-self: flex-start;
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+        }
+        .diff-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-top: 0.5rem;
+            padding: 0.35rem 0.7rem;
+            background: #1f2428;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .diff-badge:hover { background: var(--accent-hover); color: #fff; }
 
-        .config-box { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
-        input[type="password"], input[type="text"] { width: 100%; padding: 12px; background: #22222e; color: #fff; border: 1px solid #3a3a4c; border-radius: 8px; outline: none; box-sizing: border-box; font-size: 0.9rem; }
-        .msg-box { display: flex; gap: 8px; width: 100%; }
-        .btn-send { padding: 12px 20px; background: #5cf28e; color: #0f0f12; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+        footer {
+            padding: 1rem 1.5rem;
+            background-color: var(--surface);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 0.75rem;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.95rem;
+            outline: none;
+        }
+        input[type="text"]:focus { border-color: var(--accent); }
+        button {
+            padding: 0.75rem 1.25rem;
+            border-radius: 6px;
+            border: none;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: var(--accent-hover); }
+        button:disabled { background: var(--border); cursor: not-allowed; }
+
+        /* Modal für Diff-Inspektion */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.75);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .modal-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+        .modal-body {
+            padding: 1rem;
+            overflow-y: auto;
+            font-family: monospace;
+            background: #090c10;
+            color: #d2a8ff;
+            white-space: pre;
+            font-size: 0.85rem;
+        }
+        .modal-footer {
+            padding: 1rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+        .btn-success { background: var(--success); }
+        .btn-danger { background: var(--danger); }
     </style>
 </head>
 <body>
-    <h2>🤖 JARVIS CLOUD CONTROL</h2>
-    
-    <div class="dashboard">
-        <div style="color: #aaa;">Status: <span style="color: #5cf28e; font-weight: bold;">Qwen Cloud Agent aktiv</span></div>
-        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <button class="btn-small btn-snapshot" onclick="openSnapshotPopup()">📸 Snapshot</button>
-            <a id="downloadLink" class="btn-small" href="#" onclick="downloadRepoZip(event)">📦 ZIP</a>
-            <button class="btn-small btn-cloud" onclick="triggerJarvisAgent()">🚀 Start</button>
+
+    <header>
+        <div class="logo">JARVIS // CLOUD CONTROL</div>
+        <div class="status-badge">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-text">Bereit</span>
         </div>
+    </header>
+    
+    <div class="progress-bar-container">
+        <div class="progress-bar" id="progress-bar"></div>
     </div>
 
-    <!-- Snapshot Modal Popup -->
-    <div id="snapshotModalOverlay">
-        <div class="snapshot-modal-content">
-            <h3 style="color: #f0ad4e; margin: 0 0 10px 0; font-size: 1.1rem;">Projekt-Snapshot (Zusammenfassung)</h3>
-            <div style="font-size: 0.8rem; color: #aaa;">Prüfe den Bericht von JARVIS vor dem Export. Beim Export wird die Datei heruntergeladen und der Zyklus zurückgesetzt.</div>
-            <div id="snapshotContentArea" class="snapshot-scroll-area">Lade intelligenten Snapshot von JARVIS...</div>
-            <div class="modal-buttons">
-                <button class="btn-modal-cancel" onclick="closeSnapshotPopup()">Abbrechen</button>
-                <button class="btn-modal-export" onclick="executeSnapshotExport()">Export & Reset</button>
+    <div id="chat-container"></div>
+
+    <footer>
+        <input type="text" id="prompt-input" placeholder="Aufgabe für JARVIS eingeben..." autocomplete="off" />
+        <button id="send-btn" onclick="sendTask()">Senden</button>
+    </footer>
+
+    <!-- Diff-Modal -->
+    <div class="modal-overlay" id="diff-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <span>Δ Code-Diff Bestätigung (Tool-Authoring)</span>
+                <button onclick="closeModal()" style="padding: 0.2rem 0.5rem; background: transparent; color: var(--text);">✕</button>
+            </div>
+            <div class="modal-body" id="diff-content"></div>
+            <div class="modal-footer">
+                <button class="btn-danger" onclick="closeModal()">Verwerfen</button>
+                <button class="btn-success" onclick="confirmDiff()">Δ Bestätigen & Ausführen</button>
             </div>
         </div>
     </div>
 
-    <div class="config-box">
-        <input type="password" id="ghToken" placeholder="GitHub Personal Access Token..." oninput="localStorage.setItem('jarvis_gh_token', this.value.trim())">
-        <input type="text" id="ntfyTopic" placeholder="ntfy.sh Thema..." oninput="localStorage.setItem('jarvis_ntfy_topic', this.value.trim())">
-    </div>
-
-    <div id="chat"><div class="system-line">Steuerzentrale bereit.</div></div>
-    
-    <div class="msg-box">
-        <input type="text" id="msg" placeholder="Befehl für JARVIS..." onkeypress="if(event.key === 'Enter') triggerJarvisAgent();">
-        <button class="btn-send" onclick="triggerJarvisAgent()">Senden</button>
-    </div>
-
     <script>
-        document.getElementById('ghToken').value = localStorage.getItem('jarvis_gh_token') || '';
-        document.getElementById('ntfyTopic').value = localStorage.getItem('jarvis_ntfy_topic') || '';
-
-        window.onload = async function() {
-            loadLocalChat();
-            await syncWithGitHubMemory();
+        // --- KONFIGURATION ---
+        // Bitte passe deine Repository-Daten hier an:
+        const CONFIG = {
+            owner: "DEIN_GITHUB_USER",
+            repo: "DEIN_REPO_NAME",
+            pat: localStorage.getItem("JARVIS_PAT") || "", // Wird lokal gespeichert
+            memoryUrl: "memory.json"
         };
 
-        function getRepoInfo() {
-            let host = window.location.hostname;
-            let owner = host.split('.')[0];
-            let pathSegments = window.location.pathname.split('/').filter(Boolean);
-            let repo = pathSegments.length > 0 ? pathSegments[0] : 'jarvis_core';
-            return { owner, repo };
-        }
+        let currentDiff = "";
+        let isWorking = false;
+        let pollInterval = null;
+        let workStartTime = 0;
 
-        function downloadRepoZip(e) {
-            e.preventDefault();
-            let repoInfo = getRepoInfo();
-            window.open(`https://github.com/${repoInfo.owner}/${repoInfo.repo}/archive/refs/heads/main.zip`, '_blank');
-            appendMessage('system', '📦 Full-Repo ZIP-Download gestartet.');
-        }
-
-        // --- Snapshot Popup Logic ---
-        async function openSnapshotPopup() {
-            let modal = document.getElementById('snapshotModalOverlay');
-            let contentArea = document.getElementById('snapshotContentArea');
-            modal.style.display = 'flex';
-            contentArea.innerText = 'JARVIS erstellt den intelligenten Snapshot im Hintergrund... (Das dauert ca. 10–15 Sekunden)';
-
-            let repoInfo = getRepoInfo();
-            let token = document.getElementById('ghToken').value.trim() || localStorage.getItem('jarvis_gh_token');
-
-            if (!token) {
-                contentArea.innerText = "Fehler: Bitte zuerst den GitHub Personal Access Token eintragen.";
-                return;
+        // --- INIT & PERSISTENZ ---
+        window.addEventListener("DOMContentLoaded", () => {
+            if (!CONFIG.pat) {
+                const token = prompt("Bitte GitHub PAT (mit repo-Rechten) eingeben:");
+                if (token) {
+                    localStorage.setItem("JARVIS_PAT", token);
+                    CONFIG.pat = token;
+                }
             }
+            loadLocalState();
+            syncWithGitHubMemory();
+            setInterval(syncWithGitHubMemory, 5000); // Sanftes Background-Polling
+        });
+
+        function saveLocalState(messages) {
+            localStorage.setItem("JARVIS_CHAT_CACHE", JSON.stringify(messages));
+        }
+
+        function loadLocalState() {
+            const cached = localStorage.getItem("JARVIS_CHAT_CACHE");
+            if (cached) {
+                try {
+                    renderMessages(JSON.parse(cached));
+                } catch (e) {}
+            }
+        }
+
+        // --- REPOSITORY DISPATCH (Befehl senden) ---
+        async function sendTask() {
+            const input = document.getElementById("prompt-input");
+            const text = input.value.trim();
+            if (!text || isWorking) return;
+
+            input.value = "";
+            setWorkingState(true);
+
+            // Optimistisches UI-Update (schützt vor Reload-Verlust)
+            const chat = document.getElementById("chat-container");
+            appendMessage("user", text);
 
             try {
-                let triggerRes = await fetch(`https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/actions/workflows/jarvis-agent.yml/dispatches`, {
-                    method: 'POST',
+                const res = await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/dispatches`, {
+                    method: "POST",
                     headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ ref: 'main', inputs: { command: 'Erstelle den intelligenten Projekt-Snapshot' } })
-                });
-
-                if (!triggerRes.ok) {
-                    contentArea.innerText = "Fehler beim Starten von JARVIS.";
-                    return;
-                }
-
-                let fetched = false;
-                for (let i = 0; i < 8; i++) {
-                    await new Promise(r => setTimeout(r, 4000));
-                    contentArea.innerText = `Warte auf JARVIS (Versuch ${i+1}/8)...`;
-
-                    let apiRes = await fetch(`https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/contents/project_snapshot.md`, {
-                        headers: {
-                            'Authorization': `token ${token}`,
-                            'Accept': 'application/vnd.github.v3+json'
-                        }
-                    });
-
-                    if (apiRes.ok) {
-                        let fileJson = await apiRes.json();
-                        let decodedText = decodeURIComponent(escape(atob(fileJson.content)));
-                        contentArea.innerText = decodedText;
-                        fetched = true;
-                        break;
-                    }
-                }
-
-                if (!fetched) {
-                    contentArea.innerText = "Der Snapshot braucht noch einen Moment. Schließe das Popup kurz und öffne es gleich nochmal.";
-                }
-
-            } catch (err) {
-                contentArea.innerText = "Netzwerkfehler: " + err.message;
-            }
-        }
-
-        function closeSnapshotPopup() {
-            document.getElementById('snapshotModalOverlay').style.display = 'none';
-        }
-
-        function executeSnapshotExport() {
-            let contentText = document.getElementById('snapshotContentArea').innerText;
-            
-            let blob = new Blob([contentText], { type: 'text/markdown;charset=utf-8;' });
-            let url = URL.createObjectURL(blob);
-            let a = document.createElement('a');
-            a.href = url;
-            a.download = 'project_snapshot.md';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            closeSnapshotPopup();
-            appendMessage('system', '📸 Snapshot erfolgreich exportiert. Setze den Zyklus in der Cloud zurück...');
-
-            document.getElementById('msg').value = "Snapshot Export abgeschlossen. Setze den Zyklus zurück.";
-            triggerJarvisAgent();
-        }
-        // ----------------------------
-
-        async function syncWithGitHubMemory() {
-            let repoInfo = getRepoInfo();
-            try {
-                let res = await fetch(`https://raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/memory.json?t=` + Date.now());
-                if (res.ok) {
-                    let history = await res.json();
-                    let chat = document.getElementById('chat');
-                    if (history && history.length > 0) {
-                        chat.innerHTML = '<div class="system-line">Verlauf mit Cloud synchronisiert.</div>';
-                        history.forEach(item => {
-                            appendMessage('user', item.cmd, false);
-                            appendMessage('agent', item.ans, false, item.diff);
-                        });
-                    }
-                }
-            } catch (e) {}
-        }
-
-        function loadLocalChat() {
-            let savedChat = localStorage.getItem('jarvis_chat_history');
-            if (savedChat) {
-                document.getElementById('chat').innerHTML = savedChat;
-            }
-        }
-
-        function saveLocalChat() {
-            localStorage.setItem('jarvis_chat_history', document.getElementById('chat').innerHTML);
-        }
-
-        function appendMessage(type, text, save = true, diffData = null) {
-            let chat = document.getElementById('chat');
-            let div = document.createElement('div');
-            
-            if (type === 'user') {
-                div.className = 'user-line';
-                div.innerHTML = '<b>Du:</b> ' + escapeHtml(text);
-            } else if (type === 'agent') {
-                div.className = 'agent-line';
-                let html = '<b>JARVIS:</b><br>' + escapeHtml(text);
-                
-                if (diffData) {
-                    html += ` <span class="diff-indicator" title="Änderungen prüfen" onclick="toggleDiff(this)">Δ</span>`;
-                    html += `<div class="diff-modal"><b>Geplante Änderungen (Diff):</b>\n${escapeHtml(diffData)}\n\n<button onclick="approveDiff(true)" style="background:#5cf28e;border:none;padding:4px 8px;font-weight:bold;cursor:pointer;border-radius:4px;">Bestätigen</button> <button onclick="approveDiff(false)" style="background:#ff6b6b;border:none;padding:4px 8px;font-weight:bold;cursor:pointer;border-radius:4px;color:#fff;">Ablehnen</button></div>`;
-                }
-                div.innerHTML = html;
-            } else if (type === 'system') {
-                div.className = 'system-line';
-                div.innerHTML = text;
-            } else if (type === 'warn') {
-                div.className = 'warn-line';
-                div.innerHTML = text;
-            }
-
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
-            if (save) saveLocalChat();
-        }
-
-        function toggleDiff(el) {
-            let modal = el.nextElementSibling;
-            modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
-        }
-
-        function approveDiff(accepted) {
-            if (accepted) {
-                document.getElementById('msg').value = "Diff bestätigt. Führe die Änderung aus.";
-                triggerJarvisAgent();
-            } else {
-                appendMessage('system', '❌ Änderung abgelehnt.');
-            }
-        }
-
-        async function triggerJarvisAgent() {
-            let ghToken = document.getElementById('ghToken').value.trim() || localStorage.getItem('jarvis_gh_token');
-            let msgInput = document.getElementById('msg');
-            let commandText = msgInput.value.trim();
-
-            if (!ghToken) {
-                alert('Bitte GitHub Token eintragen!');
-                return;
-            }
-            if (!commandText) return;
-
-            let repoInfo = getRepoInfo();
-            appendMessage('user', commandText);
-            msgInput.value = '';
-
-            let chat = document.getElementById('chat');
-            let loadDiv = document.createElement('div');
-            loadDiv.className = 'agent-line';
-            loadDiv.id = 'activeLoader';
-            loadDiv.innerHTML = `<b>JARVIS arbeitet...</b><div class="loader-text">Agent führt Befehl in der Cloud aus (warte auf Abschluss)...</div><div class="loader-container"><div class="loader-bar"></div></div>`;
-            chat.appendChild(loadDiv);
-            chat.scrollTop = chat.scrollHeight;
-
-            try {
-                let response = await fetch(`https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/actions/workflows/jarvis-agent.yml/dispatches`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `token ${ghToken}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
+                        "Accept": "application/vnd.github+json",
+                        "Authorization": `Bearer ${CONFIG.pat}`,
+                        "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        ref: 'main',
-                        inputs: { command: commandText }
+                        event_type: "jarvis-task",
+                        client_payload: { prompt: text }
                     })
                 });
 
-                if (!response.ok) {
-                    loadDiv.remove();
-                    let errJson = await response.json();
-                    appendMessage('warn', '⚠️ Fehler beim Starten: ' + (errJson.message || response.statusText));
-                    return;
-                }
-
-                let checkAttempts = 0;
-                let maxAttempts = 15;
-
-                let pollInterval = setInterval(async () => {
-                    checkAttempts++;
-                    try {
-                        let memRes = await fetch(`https://raw.githubusercontent.com/${repoInfo.owner}/${repoInfo.repo}/main/memory.json?t=` + Date.now());
-                        if (memRes.ok) {
-                            let history = await memRes.json();
-                            if (history.length > 0) {
-                                let lastItem = history[history.length - 1];
-                                if (lastItem.cmd === commandText) {
-                                    clearInterval(pollInterval);
-                                    loadDiv.remove();
-                                    appendMessage('agent', lastItem.ans, true, lastItem.diff);
-                                    return;
-                                }
-                            }
-                        }
-                    } catch(e) {}
-
-                    if (checkAttempts >= maxAttempts) {
-                        clearInterval(pollInterval);
-                        loadDiv.remove();
-                        appendMessage('system', '⏳ Dauerte etwas länger. Bitte Seite kurz aktualisieren – das Handy-Update via ntfy.sh sollte gleich kommen.');
-                    }
-                }, 4000);
-
-            } catch (error) {
-                loadDiv.remove();
-                appendMessage('warn', '⚠️ Netzwerkfehler: ' + error.message);
+                if (!res.ok) throw new Error("Dispatch gescheitert");
+                workStartTime = Date.now();
+                startPolling();
+            } catch (err) {
+                alert("Fehler beim Senden: " + err.message);
+                setWorkingState(false);
             }
         }
 
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        // --- POLLING & SYNC ---
+        function startPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(async () => {
+                const updated = await syncWithGitHubMemory();
+                // Timeout-Fallback nach 90 Sekunden
+                if (Date.now() - workStartTime > 90000) {
+                    clearInterval(pollInterval);
+                    setWorkingState(false);
+                    appendMessage("assistant", "⚠️ System-Meldung: Lauf-Timeout (90s). Bitte prüfe den GitHub Actions Status.");
+                }
+                if (updated && !isWorking) {
+                    clearInterval(pollInterval);
+                }
+            }, 3000);
+        }
+
+        async function syncWithGitHubMemory() {
+            try {
+                // Cache-Busting Parameter gegen CDN-Caching auf GitHub Pages
+                const res = await fetch(`${CONFIG.memoryUrl}?t=${Date.now()}`);
+                if (!res.ok) return false;
+                
+                const data = await res.json();
+                
+                // Status prüfen & UI entriegeln, sobald der Lauf beendet ist
+                if (isWorking && data.last_updated) {
+                    const updateTime = new Date(data.last_updated).getTime();
+                    if (updateTime > workStartTime) {
+                        setWorkingState(false);
+                        renderMessages(data.history || []);
+                        saveLocalState(data.history || []);
+                        return true;
+                    }
+                } else if (!isWorking) {
+                    renderMessages(data.history || []);
+                    saveLocalState(data.history || []);
+                }
+            } catch (err) {
+                console.warn("Sync Fehler:", err);
+            }
+            return false;
+        }
+
+        // --- RENDERING & Δ DIFF LOGIK ---
+        function renderMessages(history) {
+            const container = document.getElementById("chat-container");
+            container.innerHTML = "";
+            history.forEach(entry => appendMessage(entry.role, entry.content));
+        }
+
+        function appendMessage(role, content) {
+            const container = document.getElementById("chat-container");
+            const div = document.createElement("div");
+            div.className = `message ${role}`;
+            
+            // Diff-Erkennung und UI-Symbol (Δ)
+            const diffMatch = content.match(/```diff([\s\S]*?)```/);
+            if (diffMatch && role === "assistant") {
+                const cleanText = content.replace(/```diff[\s\S]*?```/, "").trim();
+                div.textContent = cleanText || "JARVIS hat einen Code-Diff/Tool generiert:";
+                
+                const badge = document.createElement("div");
+                badge.className = "diff-badge";
+                badge.innerHTML = "Δ Code-Diff prüfen & bestätigen";
+                badge.onclick = () => openDiffModal(diffMatch[1].trim());
+                div.appendChild(badge);
+            } else {
+                div.textContent = content;
+            }
+
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function setWorkingState(working) {
+            isWorking = working;
+            const dot = document.getElementById("status-dot");
+            const text = document.getElementById("status-text");
+            const progress = document.getElementById("progress-bar");
+            const btn = document.getElementById("send-btn");
+
+            if (working) {
+                dot.classList.add("active");
+                text.textContent = "JARVIS arbeitet...";
+                progress.classList.add("loading");
+                btn.disabled = true;
+            } else {
+                dot.classList.remove("active");
+                text.textContent = "Bereit";
+                progress.classList.remove("loading");
+                btn.disabled = false;
+            }
+        }
+
+        // --- MODAL & BESTÄTIGUNGS-PRINZIP ---
+        function openDiffModal(diffText) {
+            currentDiff = diffText;
+            document.getElementById("diff-content").textContent = diffText;
+            document.getElementById("diff-modal").style.display = "flex";
+        }
+
+        function closeModal() {
+            document.getElementById("diff-modal").style.display = "none";
+            currentDiff = "";
+        }
+
+        async function confirmDiff() {
+            closeModal();
+            setWorkingState(true);
+            appendMessage("user", "Δ Diff bestätigt. Führe Integration aus...");
+
+            try {
+                await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/dispatches`, {
+                    method: "POST",
+                    headers: {
+                        "Accept": "application/vnd.github+json",
+                        "Authorization": `Bearer ${CONFIG.pat}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        event_type: "jarvis-confirm-diff",
+                        client_payload: { prompt: "BESTÄTIGT: Führe folgenden Diff/Tool-Integration aus:\n" + currentDiff }
+                    })
+                });
+                workStartTime = Date.now();
+                startPolling();
+            } catch (err) {
+                alert("Fehler bei Diff-Bestätigung: " + err.message);
+                setWorkingState(false);
+            }
         }
     </script>
 </body>
