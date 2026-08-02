@@ -56,15 +56,20 @@
             background: var(--text-muted);
         }
         .status-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+        .status-dot.ready { background: var(--success); box-shadow: 0 0 8px var(--success); }
         
         .icon-btn {
             background: var(--border);
             color: var(--text);
             border: none;
-            padding: 0.35rem 0.6rem;
+            padding: 0.35rem 0.7rem;
             border-radius: 6px;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-weight: 600;
         }
         .icon-btn:hover { background: var(--accent); color: #fff; }
 
@@ -151,7 +156,7 @@
             gap: 0.5rem;
             flex-shrink: 0;
         }
-        input[type="text"] {
+        input[type="text"], input[type="password"] {
             flex: 1;
             padding: 0.75rem 0.9rem;
             border-radius: 6px;
@@ -160,8 +165,10 @@
             color: var(--text);
             font-size: 0.95rem;
             outline: none;
+            width: 100%;
         }
-        input[type="text"]:focus { border-color: var(--accent); }
+        input[type="text"]:focus, input[type="password"]:focus { border-color: var(--accent); }
+        
         button.primary-btn {
             padding: 0.75rem 1rem;
             border-radius: 6px;
@@ -177,7 +184,7 @@
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             display: none;
             justify-content: center;
             align-items: center;
@@ -189,7 +196,7 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             width: 100%;
-            max-width: 600px;
+            max-width: 500px;
             max-height: 85vh;
             display: flex;
             flex-direction: column;
@@ -207,6 +214,9 @@
             padding: 1rem;
             overflow-y: auto;
             font-size: 0.9rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
         }
         .modal-footer {
             padding: 0.8rem 1rem;
@@ -225,6 +235,17 @@
         .btn-danger { background: var(--danger); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; }
         .btn-warning { background: var(--warning); color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; }
         
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+        .form-group label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
         #feedback-section {
             display: none;
             flex-direction: column;
@@ -253,7 +274,9 @@
     <header>
         <div class="logo">JARVIS // CLOUD</div>
         <div class="header-actions">
-            <button class="icon-btn" onclick="openKeyModal()" title="GitHub Schlüssel einstellen">🔑 Schlüssel</button>
+            <button class="icon-btn" onclick="openSetupModal()" title="GitHub Zugangsdaten im localStorage speichern">
+                <span>⚙️</span> <span>Setup</span>
+            </button>
             <div class="status-badge">
                 <div class="status-dot" id="status-dot"></div>
                 <span id="status-text">Bereit</span>
@@ -268,7 +291,7 @@
     <div id="chat-container">
         <div class="welcome-card" id="welcome-card">
             <strong>Willkommen bei JARVIS</strong><br><br>
-            Gib unten deine erste Aufgabe ein. Wenn du noch keinen GitHub-Schlüssel hinterlegt hast, klicke oben auf <b>🔑 Schlüssel</b>.
+            Klicke oben rechts auf <b>⚙️ Setup</b>, um deinen GitHub-Benutzernamen, den Repo-Namen und das Token im <code>localStorage</code> deines Geräts zu hinterlegen. Nichts davon ist im Frontend-Code hardcoded!
         </div>
     </div>
 
@@ -277,28 +300,39 @@
         <button class="primary-btn" id="send-btn" onclick="sendTask()">Senden</button>
     </footer>
 
-    <!-- Key Settings Modal -->
-    <div class="modal-overlay" id="key-modal">
+    <!-- Setup Modal (Alles in den localStorage / Nichts hardcoded im HTML) -->
+    <div class="modal-overlay" id="setup-modal">
         <div class="modal">
             <div class="modal-header">
-                <span>GitHub Schlüssel einstellen</span>
-                <button onclick="closeKeyModal()" style="background:none; border:none; color:var(--text); font-size:1.2rem;">✕</button>
+                <span>⚙️ GitHub Cloud Setup</span>
+                <button onclick="closeSetupModal()" style="background:none; border:none; color:var(--text); font-size:1.2rem;">✕</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom: 0.8rem; color: var(--text-muted);">
-                    Trage hier deinen persönlichen GitHub-Schlüssel (Personal Access Token mit <code>repo</code>-Rechten) ein, damit JARVIS Befehle ausführen darf:
+                <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
+                    Diese Daten werden in deinem lokalen Browser-Speicher (<code>localStorage</code>) abgelegt und stehen nirgends im öffentlichen Code:
                 </p>
-                <input type="text" id="token-input" style="width: 100%; padding: 0.6rem;" placeholder="ghp_xxxx..." />
+                <div class="form-group">
+                    <label>GITHUB BENUTZERNAME</label>
+                    <input type="text" id="setup-owner" placeholder="z. B. vibecodegr-pixel" autocomplete="off" />
+                </div>
+                <div class="form-group">
+                    <label>REPOSITORY NAME</label>
+                    <input type="text" id="setup-repo" placeholder="z. B. jarvis_core" autocomplete="off" />
+                </div>
+                <div class="form-group">
+                    <label>GITHUB PAT (TOKEN MIT REPO-RECHTEN)</label>
+                    <input type="password" id="setup-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
+                </div>
             </div>
             <div class="modal-footer">
                 <div class="footer-buttons">
-                    <button class="btn-success" onclick="saveKey()">Speichern</button>
+                    <button class="btn-success" onclick="saveSetup()">Im localStorage speichern</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Diff-Modal mit Feedback/Ausbessern-Kreislauf -->
+    <!-- Diff-Modal mit Ausbessern-Kreislauf -->
     <div class="modal-overlay" id="diff-modal">
         <div class="modal">
             <div class="modal-header">
@@ -312,7 +346,6 @@
                     <button class="btn-warning" onclick="toggleFeedback()">✏️ Ausbessern / Feedback</button>
                     <button class="btn-success" onclick="confirmDiff()">Δ Bestätigen</button>
                 </div>
-                <!-- Aufklappbares Feld für den Feedback-Kreislauf -->
                 <div id="feedback-section">
                     <textarea id="feedback-input" placeholder="Was soll JARVIS an diesem Entwurf ändern? (z.B. 'Mach das lieber automatisch um 8 Uhr')"></textarea>
                     <button class="btn-warning" style="align-self: flex-end;" onclick="submitFeedback()">Anweisung zur Ausbesserung senden</button>
@@ -322,9 +355,10 @@
     </div>
 
     <script>
+        // --- KONFIGURATION AUTOMATISCH AUS DEM LOCALSTORAGE LADEN ---
         const CONFIG = {
-            owner: "DEIN_GITHUB_USER",
-            repo: "DEIN_REPO_NAME",
+            owner: localStorage.getItem("JARVIS_OWNER") || "",
+            repo: localStorage.getItem("JARVIS_REPO") || "",
             pat: localStorage.getItem("JARVIS_PAT") || "",
             memoryUrl: "memory.json"
         };
@@ -335,6 +369,7 @@
         let workStartTime = 0;
 
         window.addEventListener("DOMContentLoaded", () => {
+            updateStatusIndicator();
             loadLocalState();
             syncWithGitHubMemory();
             setInterval(syncWithGitHubMemory, 5000);
@@ -344,23 +379,50 @@
             });
         });
 
-        function openKeyModal() {
-            document.getElementById("token-input").value = CONFIG.pat;
-            document.getElementById("key-modal").style.display = "flex";
-        }
-
-        function closeKeyModal() {
-            document.getElementById("key-modal").style.display = "none";
-        }
-
-        function saveKey() {
-            const token = document.getElementById("token-input").value.trim();
-            if (token) {
-                localStorage.setItem("JARVIS_PAT", token);
-                CONFIG.pat = token;
-                closeKeyModal();
-                alert("Schlüssel erfolgreich gespeichert!");
+        function updateStatusIndicator() {
+            const dot = document.getElementById("status-dot");
+            if (CONFIG.owner && CONFIG.repo && CONFIG.pat) {
+                dot.classList.add("ready");
+            } else {
+                dot.classList.remove("ready");
             }
+        }
+
+        // --- SETUP MODAL / LOCALSTORAGE ---
+        function openSetupModal() {
+            document.getElementById("setup-owner").value = CONFIG.owner;
+            document.getElementById("setup-repo").value = CONFIG.repo;
+            document.getElementById("setup-token").value = CONFIG.pat;
+            document.getElementById("setup-modal").style.display = "flex";
+        }
+
+        function closeSetupModal() {
+            document.getElementById("setup-modal").style.display = "none";
+        }
+
+        function saveSetup() {
+            const owner = document.getElementById("setup-owner").value.trim();
+            const repo = document.getElementById("setup-repo").value.trim();
+            const token = document.getElementById("setup-token").value.trim();
+
+            if (!owner || !repo || !token) {
+                alert("Bitte fülle alle 3 Felder aus.");
+                return;
+            }
+
+            // Sicher im localStorage ablegen
+            localStorage.setItem("JARVIS_OWNER", owner);
+            localStorage.setItem("JARVIS_REPO", repo);
+            localStorage.setItem("JARVIS_PAT", token);
+
+            CONFIG.owner = owner;
+            CONFIG.repo = repo;
+            CONFIG.pat = token;
+
+            updateStatusIndicator();
+            closeSetupModal();
+            syncWithGitHubMemory();
+            alert("Erfolgreich im localStorage gespeichert!");
         }
 
         function saveLocalState(messages) {
@@ -377,9 +439,10 @@
             }
         }
 
+        // --- DISPATCH & AUFGABEN ---
         async function sendTask(customPrompt = null) {
-            if (!CONFIG.pat) {
-                openKeyModal();
+            if (!CONFIG.pat || !CONFIG.owner || !CONFIG.repo) {
+                openSetupModal();
                 return;
             }
             const input = document.getElementById("prompt-input");
@@ -405,7 +468,7 @@
                     })
                 });
 
-                if (!res.ok) throw new Error("Keine Verbindung zu GitHub. Ist der Schlüssel richtig?");
+                if (!res.ok) throw new Error("Keine Verbindung zu GitHub. Sind deine 3 Einträge im Setup korrekt?");
                 workStartTime = Date.now();
                 startPolling();
             } catch (err) {
@@ -431,6 +494,7 @@
 
         async function syncWithGitHubMemory() {
             try {
+                if (!CONFIG.owner || !CONFIG.repo) return false;
                 const res = await fetch(`${CONFIG.memoryUrl}?t=${Date.now()}`);
                 if (!res.ok) return false;
                 
@@ -505,6 +569,7 @@
                 text.textContent = "Bereit";
                 progress.classList.remove("loading");
                 btn.disabled = false;
+                updateStatusIndicator();
             }
         }
 
@@ -536,7 +601,6 @@
                 return;
             }
             closeDiffModal();
-            // Sendet eine klare Ausbesserungs-Anweisung in den Kreislauf zurück!
             const promptText = `ÜBERARBEITUNG VON DIFF GEFORDERT (Nicht übernehmen!):\nGrund / Änderungswunsch: "${feedbackText}"\n\nBisheriger Entwurf war:\n\`\`\`diff\n${currentDiff}\n\`\`\`\nBitte erstelle einen neuen, korrigierten Diff-Vorschlag.`;
             sendTask(promptText);
         }
