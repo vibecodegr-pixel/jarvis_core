@@ -57,7 +57,7 @@
         }
         .status-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
         .status-dot.ready { background: var(--success); box-shadow: 0 0 8px var(--success); }
-        
+
         .icon-btn {
             background: var(--border);
             color: var(--text);
@@ -72,8 +72,7 @@
             font-weight: 600;
         }
         .icon-btn:hover { background: var(--accent); color: #fff; }
-
-        .progress-bar-container {
+.progress-bar-container {
             width: 100%;
             height: 3px;
             background: transparent;
@@ -254,7 +253,7 @@
             padding-top: 0.5rem;
             border-top: 1px dashed var(--border);
         }
-        #feedback-input {
+#feedback-input {
             width: 100%;
             padding: 0.6rem;
             border-radius: 6px;
@@ -291,7 +290,7 @@
     <div id="chat-container">
         <div class="welcome-card" id="welcome-card">
             <strong>Willkommen bei JARVIS</strong><br><br>
-            Klicke oben rechts auf <b>⚙️ Setup</b>, um deinen GitHub-Benutzernamen, den Repo-Namen und das Token im <code>localStorage</code> deines Geräts zu hinterlegen. Nichts davon ist im Frontend-Code hardcoded!
+            Klicke oben rechts auf <b>⚙️ Setup</b>, um deinen GitHub-Benutzernamen, den Repo-Namen und das Token im <code>localStorage</code> deines Geräts zu hinterlegen.
         </div>
     </div>
 
@@ -300,7 +299,7 @@
         <button class="primary-btn" id="send-btn" onclick="sendTask()">Senden</button>
     </footer>
 
-    <!-- Setup Modal (Alles in den localStorage / Nichts hardcoded im HTML) -->
+    <!-- Setup Modal -->
     <div class="modal-overlay" id="setup-modal">
         <div class="modal">
             <div class="modal-header">
@@ -309,7 +308,7 @@
             </div>
             <div class="modal-body">
                 <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
-                    Diese Daten werden in deinem lokalen Browser-Speicher (<code>localStorage</code>) abgelegt und stehen nirgends im öffentlichen Code:
+                    Diese Daten werden sicher in deinem lokalen Browser-Speicher (<code>localStorage</code>) abgelegt:
                 </p>
                 <div class="form-group">
                     <label>GITHUB BENUTZERNAME</label>
@@ -332,14 +331,14 @@
         </div>
     </div>
 
-    <!-- Diff-Modal mit Ausbessern-Kreislauf -->
+    <!-- Diff-Modal -->
     <div class="modal-overlay" id="diff-modal">
         <div class="modal">
             <div class="modal-header">
                 <span>Δ Code-Vorschlag prüfen</span>
                 <button onclick="closeDiffModal()" style="background:none; border:none; color:var(--text); font-size:1.2rem;">✕</button>
             </div>
-            <div class="modal-body" id="diff-content" style="font-family: monospace; background: #090c10; color: #d2a8ff; white-space: pre;"></div>
+            <div class="modal-body" id="diff-content" style="font-family: monospace; background: #090c10; color: #d2a8ff; white-space: pre; overflow-x: auto;"></div>
             <div class="modal-footer">
                 <div class="footer-buttons">
                     <button class="btn-danger" onclick="closeDiffModal()">Verwerfen</button>
@@ -347,15 +346,14 @@
                     <button class="btn-success" onclick="confirmDiff()">Δ Bestätigen</button>
                 </div>
                 <div id="feedback-section">
-                    <textarea id="feedback-input" placeholder="Was soll JARVIS an diesem Entwurf ändern? (z.B. 'Mach das lieber automatisch um 8 Uhr')"></textarea>
-                    <button class="btn-warning" style="align-self: flex-end;" onclick="submitFeedback()">Anweisung zur Ausbesserung senden</button>
+                    <textarea id="feedback-input" placeholder="Was soll JARVIS an diesem Entwurf ändern?"></textarea>
+                    <button class="btn-warning" style="align-self: flex-end;" onclick="submitFeedback()">Anweisung senden</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- KONFIGURATION AUTOMATISCH AUS DEM LOCALSTORAGE LADEN ---
         const CONFIG = {
             owner: localStorage.getItem("JARVIS_OWNER") || "",
             repo: localStorage.getItem("JARVIS_REPO") || "",
@@ -372,6 +370,8 @@
             updateStatusIndicator();
             loadLocalState();
             syncWithGitHubMemory();
+            
+            // Automatisches Polling alle 5 Sekunden (kein manuelles F5 mehr nötig)
             setInterval(syncWithGitHubMemory, 5000);
             
             document.getElementById("prompt-input").addEventListener("keypress", (e) => {
@@ -388,7 +388,6 @@
             }
         }
 
-        // --- SETUP MODAL / LOCALSTORAGE ---
         function openSetupModal() {
             document.getElementById("setup-owner").value = CONFIG.owner;
             document.getElementById("setup-repo").value = CONFIG.repo;
@@ -406,11 +405,10 @@
             const token = document.getElementById("setup-token").value.trim();
 
             if (!owner || !repo || !token) {
-                alert("Bitte fülle alle 3 Felder aus.");
+                alert("Bitte fülle alle Felder aus.");
                 return;
             }
 
-            // Sicher im localStorage ablegen
             localStorage.setItem("JARVIS_OWNER", owner);
             localStorage.setItem("JARVIS_REPO", repo);
             localStorage.setItem("JARVIS_PAT", token);
@@ -422,7 +420,7 @@
             updateStatusIndicator();
             closeSetupModal();
             syncWithGitHubMemory();
-            alert("Erfolgreich im localStorage gespeichert!");
+            alert("Erfolgreich gespeichert!");
         }
 
         function saveLocalState(messages) {
@@ -439,7 +437,6 @@
             }
         }
 
-        // --- DISPATCH & AUFGABEN ---
         async function sendTask(customPrompt = null) {
             if (!CONFIG.pat || !CONFIG.owner || !CONFIG.repo) {
                 openSetupModal();
@@ -451,7 +448,6 @@
 
             if (!customPrompt) input.value = "";
             setWorkingState(true);
-
             appendMessage("user", text);
 
             try {
@@ -468,28 +464,12 @@
                     })
                 });
 
-                if (!res.ok) throw new Error("Keine Verbindung zu GitHub. Sind deine 3 Einträge im Setup korrekt?");
+                if (!res.ok) throw new Error("GitHub Dispatch fehlgeschlagen.");
                 workStartTime = Date.now();
-                startPolling();
             } catch (err) {
-                alert("Fehler: " + err.message);
-                setWorkingState(false);
+                console.error("Dispatch Fehler:", err);
+                // Fallback: Trotz Netzwerkfehler im Polling weitersuchen, falls GitHub es dennoch angenommen hat
             }
-        }
-
-        function startPolling() {
-            if (pollInterval) clearInterval(pollInterval);
-            pollInterval = setInterval(async () => {
-                const updated = await syncWithGitHubMemory();
-                if (Date.now() - workStartTime > 90000) {
-                    clearInterval(pollInterval);
-                    setWorkingState(false);
-                    appendMessage("assistant", "⚠️ Zeitüberschreitung nach 90 Sekunden. Bitte prüfe deine Cloud.");
-                }
-                if (updated && !isWorking) {
-                    clearInterval(pollInterval);
-                }
-            }, 3000);
         }
 
         async function syncWithGitHubMemory() {
@@ -597,21 +577,21 @@
         function submitFeedback() {
             const feedbackText = document.getElementById("feedback-input").value.trim();
             if (!feedbackText) {
-                alert("Bitte schreibe kurz, was geändert werden soll.");
+                alert("Bitte Feedback eingeben.");
                 return;
             }
             closeDiffModal();
-            const promptText = `ÜBERARBEITUNG VON DIFF GEFORDERT (Nicht übernehmen!):\nGrund / Änderungswunsch: "${feedbackText}"\n\nBisheriger Entwurf war:\n\`\`\`diff\n${currentDiff}\n\`\`\`\nBitte erstelle einen neuen, korrigierten Diff-Vorschlag.`;
+            const promptText = `ÜBERARBEITUNG GEFORDERT:\nFeedback: "${feedbackText}"\n\nEntwurf war:\n\`\`\`diff\n${currentDiff}\n\`\`\`\nBitte korrigieren.`;
             sendTask(promptText);
         }
 
         async function confirmDiff() {
             closeDiffModal();
             setWorkingState(true);
-            appendMessage("user", "Δ Vorschlag bestätigt. Bitte umsetzen.");
+            appendMessage("user", "Δ Vorschlag bestätigt. Führe aus.");
 
             try {
-                await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/dispatches`, {
+                const res = await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/dispatches`, {
                     method: "POST",
                     headers: {
                         "Accept": "application/vnd.github+json",
@@ -623,11 +603,12 @@
                         client_payload: { prompt: "BESTÄTIGT: Führe folgende Änderung aus:\n" + currentDiff }
                     })
                 });
+                if (!res.ok) throw new Error("Bestätigungs-Dispatch fehlgeschlagen.");
                 workStartTime = Date.now();
-                startPolling();
             } catch (err) {
-                alert("Fehler bei der Bestätigung: " + err.message);
+                console.error("Confirm Fehler:", err);
                 setWorkingState(false);
+                alert("Fehler beim Senden der Bestätigung: " + err.message);
             }
         }
     </script>
