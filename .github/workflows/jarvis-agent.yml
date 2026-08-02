@@ -1,201 +1,144 @@
-name: JARVIS Cloud Agent (HF API & Dynamic)
-
-concurrency:
-  group: jarvis-memory-lock
-  cancel-in-progress: false
+name: JARVIS Autonomous Cloud Agent
 
 on:
+  repository_dispatch:
+    types: [jarvis-task, jarvis-confirm-diff]
   workflow_dispatch:
     inputs:
-      command:
-        description: 'Befehl für JARVIS'
-        required: true
-        default: 'System-Check'
+      prompt:
+        description: 'Manuelle Eingabe für JARVIS'
+        required: false
+        default: 'System Check'
+
+permissions:
+  contents: write
 
 jobs:
   run-agent:
     runs-on: ubuntu-latest
-    
-    permissions:
-      contents: write
-    
     steps:
-      - name: Repository auschecken
+      - name: 1. Repository auschecken
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Python einrichten
+      - name: 2. Python Setup & Abhängigkeiten
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
+      - run: pip install requests
 
-      - name: Abhängigkeiten installieren
-        run: |
-          python -m pip install --upgrade pip
-          pip install huggingface_hub requests
-
-      - name: JARVIS über Hugging Face API ausführen
+      - name: 3. JARVIS Core Engine ausführen
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          USER_COMMAND: ${{ github.event.inputs.command }}
+          EVENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+          DISPATCH_PROMPT: ${{ github.event.client_payload.prompt }}
+          MANUAL_PROMPT: ${{ github.event.inputs.prompt }}
         run: |
-          python -c "
-          import os
-          import time
-          import json
-          import re
-          from datetime import datetime
-          from huggingface_hub import InferenceClient
+          cat << 'EOF' > agent.py
+          import os, json, time, requests, sys
+          from datetime import datetime, timezone
 
-          start_time = time.time()
-          token = os.environ.get('HF_TOKEN')
-          command = os.environ.get('USER_COMMAND', 'System-Check')
+          HF_TOKEN = os.environ.get("HF_TOKEN", "")
+          MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
+          API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
 
-          status = 'ERFOLG'
-          answer = ''
-          error_occurred = False
+          # Eingabe ermitteln
+          prompt = os.environ.get("DISPATCH_PROMPT") or os.environ.get("MANUAL_PROMPT") or "Status Check"
+          
+          # Speicher & Instruktionen laden
+          memory_file = "memory.json"
+          instructions_file = "instructions.md"
 
           try:
-              quota_file = 'quota.json'
-              quota_data = {'cloud_runs': 0, 'total_tokens': 0}
-              if os.path.exists(quota_file):
-                  try:
-                      with open(quota_file, 'r', encoding='utf-8') as f:
-                          quota_data = json.load(f)
-                  except:
-                      pass
-              quota_data['cloud_runs'] = quota_data.get('cloud_runs', 0) + 1
+              with open(memory_file, "r", encoding="utf-8") as f:
+                  memory = json.load(f)
+          except Exception:
+              memory = {"history": [], "status": "idle", "last_updated": ""}
 
-              memory_file = 'memory.json'
-              history = []
-              if os.path.exists(memory_file):
-                  try:
-                      with open(memory_file, 'r', encoding='utf-8') as f:
-                          history = json.load(f)
-                  except:
-                      history = []
+          try:
+              with open(instructions_file, "r", encoding="utf-8") as f:
+                  instructions = f.read()
+          except Exception:
+              instructions = "Du bist JARVIS, ein autonomer Agent mit Fähigkeit zur Tool-Erstellung."
 
-              is_snapshot_req = 'snapshot' in command.lower()
-              is_reset_req = 'reset' in command.lower() or 'export abgeschlossen' in command.lower()
+          system_prompt = f"""
+          {instructions}
+          
+          WICHTIGE REGELN FÜR AUTONOMIE & DIFF-AUTHORING:
+          1. Wenn du eine Aufgabe löst, die Code, ein neues Tool oder eine Skriptänderung erfordert, gib IMMER einen sauberen Code-Diff im Unified-Diff-Format aus, umschlossen von ```diff ... ```.
+          2. Antworte präzise, lösungsorientiert und professionell auf Deutsch.
+          3. Wenn kein Code geändert werden muss, antworte normal ohne Diff-Block.
+          """
 
-              snapshot_meta_file = 'snapshot_meta.json'
-              last_snapshot_time = 'Start der Historie'
-              if os.path.exists(snapshot_meta_file):
-                  try:
-                      with open(snapshot_meta_file, 'r', encoding='utf-8') as f:
-                          meta = json.load(f)
-                          last_snapshot_time = meta.get('last_timestamp', 'Start der Historie')
-                  except:
-                      pass
+          messages = [{"role": "system", "content": system_prompt}]
+          for entry in memory.get("history", [])[-8:]:
+              messages.append({"role": entry.get("role", "user"), "content": entry.get("content", "")})
+          messages.append({"role": "user", "content": prompt})
 
-              client = InferenceClient(
-                  model='Qwen/Qwen2.5-7B-Instruct',
-                  token=token
-              )
-              
-              if is_snapshot_req:
-                  system_prompt = (
-                      'Du bist JARVIS. Erstelle einen professionellen, flüssig lesbaren Projekt-Snapshot '
-                      'im Markdown-Format basierend auf der Historie seit (' + last_snapshot_time + ').\n'
-                      'Strukturiere den Bericht in: 1. Zusammenfassung, 2. Neue Tools/Erkenntnisse, 3. Bereinigungen.\n'
-                      'Antworte AUSSCHLIESSLICH als JSON:\n'
-                      '{\n  \"ans\": \"Kurze Bestätigung\",\n'
-                      '  \"snapshot_content\": \"Vollständiger Markdown-Text\"\n}'
-                  )
-              else:
-                  system_prompt = (
-                      'Du bist JARVIS, ein autonomer Software-Agent. Führe den Befehl aus.\n'
-                      'Antworte AUSSCHLIESSLICH im JSON-Format mit exakt diesen Schlüsseln:\n'
-                      '{\n  \"ans\": \"Deine Antwort für den Chat\",\n'
-                      '  \"diff\": \"Exakter Code-Diff falls Code geändert wird, sonst leerer String\"\n}'
-                  )
+          # HF API Call mit Retries
+          headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
+          payload = {
+              "model": MODEL_ID,
+              "messages": messages,
+              "max_tokens": 1500,
+              "temperature": 0.3
+          }
 
-              response = client.chat.completions.create(
-                  messages=[
-                      {'role': 'system', 'content': system_prompt},
-                      {'role': 'user', 'content': command}
-                  ],
-                  max_tokens=800
-              )
-              raw_content = response.choices[0].message.content.strip()
-              
-              json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
-              parsed = {}
-              if json_match:
-                  try:
-                      parsed = json.loads(json_match.group(0))
-                      answer = parsed.get('ans', raw_content)
-                      diff_data = parsed.get('diff', '')
-                  except Exception:
-                      answer = raw_content
-                      diff_data = ''
-              else:
-                  answer = raw_content
-                  diff_data = ''
+          assistant_reply = "Fehler: Keine Antwort erhalten."
+          status = "success"
 
-              if is_snapshot_req:
-                  snapshot_text = parsed.get('snapshot_content', '# Projekt-Snapshot\n\n' + raw_content)
-                  with open('project_snapshot.md', 'w', encoding='utf-8') as f:
-                      f.write(snapshot_text)
-                  diff_data = 'project_snapshot.md aktualisiert.'
-
-              if is_reset_req:
-                  now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                  with open(snapshot_meta_file, 'w', encoding='utf-8') as f:
-                      json.dump({'last_timestamp': now_str}, f, ensure_ascii=False, indent=2)
-                  if os.path.exists('project_snapshot.md'):
-                      os.remove('project_snapshot.md')
-                  answer = 'Snapshot-Zyklus erfolgreich zurückgesetzt.'
-
-              used_tokens = len(command.split()) + len(answer.split())
-              quota_data['total_tokens'] = quota_data.get('total_tokens', 0) + used_tokens
-
-              history.append({'cmd': command, 'ans': answer, 'diff': diff_data})
-              history = history[-15:]
-              with open(memory_file, 'w', encoding='utf-8') as f:
-                  json.dump(history, f, ensure_ascii=False, indent=2)
-
-              with open(quota_file, 'w', encoding='utf-8') as f:
-                  json.dump(quota_data, f, ensure_ascii=False, indent=2)
-
-          except Exception as e:
-              status = 'FEHLER'
-              error_occurred = True
-              answer = f'Absturz im Agenten: {str(e)}'
-              print(f'Fehler aufgetreten: {e}')
+          for attempt in range(3):
               try:
-                  memory_file = 'memory.json'
-                  history = []
-                  if os.path.exists(memory_file):
-                      with open(memory_file, 'r', encoding='utf-8') as f:
-                          history = json.load(f)
-                  history.append({'cmd': command, 'ans': answer, 'diff': ''})
-                  with open(memory_file, 'w', encoding='utf-8') as f:
-                      json.dump(history, f, ensure_ascii=False, indent=2)
-              except:
-                  pass
+                  response = requests.post(
+                      "https://api.inference.huggingface.co/models/" + MODEL_ID + "/v1/chat/completions",
+                      headers=headers,
+                      json=payload,
+                      timeout=45
+                  )
+                  if response.status_code == 200:
+                      data = response.json()
+                      assistant_reply = data["choices"][0]["message"]["content"]
+                      status = "success"
+                      break
+                  else:
+                      time.sleep(3)
+              except Exception as e:
+                  assistant_reply = f"Systemfehler bei Inferenz: {str(e)}"
+                  status = "error"
+                  time.sleep(3)
 
-          # Benachrichtigungsdatei wird GARANTIERT am Ende geschrieben (Erfolg oder genaue Fehlermeldung)
-          duration = round(time.time() - start_time, 2)
-          notif_text = f'🤖 JARVIS [{status}] • Lauf #{quota_data.get(\"cloud_runs\", 1)} ({duration}s)\n{answer}'
-          with open('/tmp/jarvis_notif.txt', 'w', encoding='utf-8') as f:
-              f.write(notif_text)
+          # History & State aktualisieren (Garantierter Write)
+          memory["history"].append({"role": "user", "content": prompt, "timestamp": datetime.now(timezone.utc).isoformat()})
+          memory["history"].append({"role": "assistant", "content": assistant_reply, "timestamp": datetime.now(timezone.utc).isoformat()})
+          memory["status"] = status
+          memory["last_updated"] = datetime.now(timezone.utc).isoformat()
 
-          if error_occurred:
-              exit(1)
-          "
+          with open(memory_file, "w", encoding="utf-8") as f:
+              json.dump(memory, f, indent=2, ensure_ascii=False)
 
-      - name: Änderungen committen & pushen
+          # Exit-Code 0 garantieren, damit Workflow Commit/Ntfy ausführt
+          sys.exit(0)
+          EOF
+          python agent.py
+
+      - name: 4. Git Commit & Push (Garantierter State-Sync)
         if: always()
         run: |
-          git config --global user.name 'JARVIS Cloud Agent'
-          git config --global user.email 'agent@jarvis.local'
-          git add memory.json quota.json snapshot_meta.json project_snapshot.md 2>/dev/null || true
-          git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Update' && git push)
+          git config --global user.name "JARVIS Cloud Agent"
+          git config --global user.email "jarvis@autonomous.local"
+          git add memory.json
+          git commit -m "chore(jarvis): update memory & agent state [skip ci]" || echo "No changes to commit"
+          git pull --rebase origin main || true
+          git push origin main || true
 
-      - name: Benachrichtigung senden (Erst am Ende bei Fertigstellung oder Fehler)
+      - name: 5. Push-Benachrichtigung (ntfy.sh)
         if: always()
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          JOB_STATUS: ${{ job.status }}
         run: |
-          TOPIC="${NTFY_TOPIC:-jarvis-status-GR-998877}"
-          curl -s -X POST "https://ntfy.sh/$TOPIC" --data-binary "@/tmp/jarvis_notif.txt"
+          if [ -n "$NTFY_TOPIC" ]; then
+            if [ "$JOB_STATUS" = "success" ]; else_msg="JARVIS Lauf abgeschlossen"; else else_msg="JARVIS Lauf mit Status: $JOB_STATUS beendet"; fi
+            curl -s -d "JARVIS Cloud Agent: $JOB_STATUS" "https://ntfy.sh/$NTFY_TOPIC" || true
+          fi
