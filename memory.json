@@ -54,8 +54,18 @@
       "role": "assistant",
       "content": "Systemfehler bei Inferenz: HTTPSConnectionPool(host='api-inference.huggingface.co', port=443): Max retries exceeded with url: /models/Qwen/Qwen2.5-7B-Instruct/v1/chat/completions (Caused by NameResolutionError(\"HTTPSConnection(host='api-inference.huggingface.co', port=443): Failed to resolve 'api-inference.huggingface.co' ([Errno -5] No address associated with hostname)\"))",
       "timestamp": "2026-08-02T12:04:09.206168+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Hallo JARVIS, wer bist du und was machen wir heute",
+      "timestamp": "2026-08-02T12:09:32.490125+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Inferenz-Fehler: HTTPSConnectionPool(host='api-inference.huggingface.co', port=443): Max retries exceeded with url: /models/Qwen/Qwen2.5-7B-Instruct (Caused by NameResolutionError(\"HTTPSConnection(host='api-inference.huggingface.co', port=443): Failed to resolve 'api-inference.huggingface.co' ([Errno -5] No address associated with hostname)\"))",
+      "timestamp": "2026-08-02T12:09:32.490158+00:00"
     }
   ],
   "status": "error",
-  "last_updated": "2026-08-02T12:04:09.206173+00:00"
+  "last_updated": "2026-08-02T12:09:32.490162+00:00"
 }
