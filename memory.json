@@ -64,8 +64,18 @@
       "role": "assistant",
       "content": "Inferenz-Fehler: HTTPSConnectionPool(host='api-inference.huggingface.co', port=443): Max retries exceeded with url: /models/Qwen/Qwen2.5-7B-Instruct (Caused by NameResolutionError(\"HTTPSConnection(host='api-inference.huggingface.co', port=443): Failed to resolve 'api-inference.huggingface.co' ([Errno -5] No address associated with hostname)\"))",
       "timestamp": "2026-08-02T12:09:32.490158+00:00"
+    },
+    {
+      "role": "user",
+      "content": "hallo, wer bist du und was kannst du ?",
+      "timestamp": "2026-08-02T12:14:30.985484+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Ich bin JARVIS, dein KI-Agent. Ich kann dir helfen, Aufgaben zu erledigen, Informationen zu recherchieren und dich in verschiedenen Aspekten des Alltags zu unterstützen. Heute können wir beispielsweise eine Liste deiner Aufgaben durchgehen, dir Informationen zu einem bestimmten Thema liefern oder dir bei der Planung deines Tages helfen.\n\nWas möchtest du heute tun?",
+      "timestamp": "2026-08-02T12:14:30.985502+00:00"
     }
   ],
-  "status": "error",
-  "last_updated": "2026-08-02T12:09:32.490162+00:00"
+  "status": "success",
+  "last_updated": "2026-08-02T12:14:30.985505+00:00"
 }
