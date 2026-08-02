@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
 MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
-# Der neue, stabile OpenAI-kompatible Router-Endpunkt von Hugging Face
 API_URL = "https://router.huggingface.co/v1/chat/completions"
 
 prompt = os.environ.get("DISPATCH_PROMPT") or os.environ.get("MANUAL_PROMPT") or "Status Check"
@@ -35,13 +34,14 @@ except Exception:
 system_prompt = f"""
 {instructions}
 
-REGELN:
-1. Antworte präzise, direkt und auf Deutsch.
-2. Wenn der Nutzer ein Tool fordert, erstelle den Code.
+AUTONOME REGELN FÜR DICH:
+1. Du bist ein sich selbst weiterentwickelnder Agent. Du hilfst Guido bei seinen Projekten und der Automatisierung.
+2. Wenn eine Aufgabe ein neues Skript, ein Tool oder eine Code-Änderung erfordert, erstelle den Code und gib ihn sauber in einem ```diff ... ``` Block oder als Code-Vorschlag aus.
+3. Antworte immer direkt, präzise und auf Deutsch.
 """
 
 messages = [{"role": "system", "content": system_prompt}]
-for entry in memory.get("history", [])[-6:]:
+for entry in memory.get("history", [])[-8:]:
     if isinstance(entry, dict):
         messages.append({"role": entry.get("role", "user"), "content": entry.get("content", "")})
 messages.append({"role": "user", "content": prompt})
@@ -50,7 +50,7 @@ headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/j
 payload = {
     "model": MODEL_ID,
     "messages": messages,
-    "max_tokens": 1000,
+    "max_tokens": 1500,
     "temperature": 0.3
 }
 
