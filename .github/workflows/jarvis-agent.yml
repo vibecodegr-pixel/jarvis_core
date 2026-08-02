@@ -41,7 +41,7 @@ jobs:
 
           HF_TOKEN = os.environ.get("HF_TOKEN", "")
           MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
-          API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
+          API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}/v1/chat/completions"
 
           # Eingabe ermitteln
           prompt = os.environ.get("DISPATCH_PROMPT") or os.environ.get("MANUAL_PROMPT") or "Status Check"
@@ -91,7 +91,7 @@ jobs:
           for attempt in range(3):
               try:
                   response = requests.post(
-                      "https://api.inference.huggingface.co/models/" + MODEL_ID + "/v1/chat/completions",
+                      API_URL,
                       headers=headers,
                       json=payload,
                       timeout=45
@@ -127,7 +127,7 @@ jobs:
         run: |
           git config --global user.name "JARVIS Cloud Agent"
           git config --global user.email "jarvis@autonomous.local"
-          git add memory.json
+          git add -A
           git commit -m "chore(jarvis): update memory & agent state [skip ci]" || echo "No changes to commit"
           git pull --rebase origin main || true
           git push origin main || true
@@ -139,6 +139,10 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: |
           if [ -n "$NTFY_TOPIC" ]; then
-            if [ "$JOB_STATUS" = "success" ]; else_msg="JARVIS Lauf abgeschlossen"; else else_msg="JARVIS Lauf mit Status: $JOB_STATUS beendet"; fi
-            curl -s -d "JARVIS Cloud Agent: $JOB_STATUS" "https://ntfy.sh/$NTFY_TOPIC" || true
+            if [ "$JOB_STATUS" = "success" ]; then
+              msg="JARVIS Lauf abgeschlossen"
+            else
+              msg="JARVIS Lauf mit Status: $JOB_STATUS beendet"
+            fi
+            curl -s -d "$msg" "https://ntfy.sh/$NTFY_TOPIC" || true
           fi
