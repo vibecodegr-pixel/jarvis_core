@@ -50,47 +50,43 @@ jobs:
           token = os.environ.get('HF_TOKEN')
           command = os.environ.get('USER_COMMAND', 'System-Check')
 
-          print(f'[Tracking] Starte HF-Inferenz für: {command}')
-          
-          # Quota laden
-          quota_file = 'quota.json'
-          quota_data = {'cloud_runs': 0, 'total_tokens': 0}
-          if os.path.exists(quota_file):
-              try:
-                  with open(quota_file, 'r', encoding='utf-8') as f:
-                      quota_data = json.load(f)
-              except:
-                  pass
-          quota_data['cloud_runs'] = quota_data.get('cloud_runs', 0) + 1
-
-          # Gedächtnis laden
-          memory_file = 'memory.json'
-          history = []
-          if os.path.exists(memory_file):
-              try:
-                  with open(memory_file, 'r', encoding='utf-8') as f:
-                      history = json.load(f)
-              except:
-                  history = []
-
-          is_snapshot_req = 'snapshot' in command.lower()
-          is_reset_req = 'reset' in command.lower() or 'export abgeschlossen' in command.lower()
-
-          snapshot_meta_file = 'snapshot_meta.json'
-          last_snapshot_time = 'Start der Historie'
-          if os.path.exists(snapshot_meta_file):
-              try:
-                  with open(snapshot_meta_file, 'r', encoding='utf-8') as f:
-                      meta = json.load(f)
-                      last_snapshot_time = meta.get('last_timestamp', 'Start der Historie')
-              except:
-                  pass
-
           status = 'ERFOLG'
           answer = ''
-          diff_data = ''
+          error_occurred = False
 
           try:
+              quota_file = 'quota.json'
+              quota_data = {'cloud_runs': 0, 'total_tokens': 0}
+              if os.path.exists(quota_file):
+                  try:
+                      with open(quota_file, 'r', encoding='utf-8') as f:
+                          quota_data = json.load(f)
+                  except:
+                      pass
+              quota_data['cloud_runs'] = quota_data.get('cloud_runs', 0) + 1
+
+              memory_file = 'memory.json'
+              history = []
+              if os.path.exists(memory_file):
+                  try:
+                      with open(memory_file, 'r', encoding='utf-8') as f:
+                          history = json.load(f)
+                  except:
+                      history = []
+
+              is_snapshot_req = 'snapshot' in command.lower()
+              is_reset_req = 'reset' in command.lower() or 'export abgeschlossen' in command.lower()
+
+              snapshot_meta_file = 'snapshot_meta.json'
+              last_snapshot_time = 'Start der Historie'
+              if os.path.exists(snapshot_meta_file):
+                  try:
+                      with open(snapshot_meta_file, 'r', encoding='utf-8') as f:
+                          meta = json.load(f)
+                          last_snapshot_time = meta.get('last_timestamp', 'Start der Historie')
+                  except:
+                      pass
+
               client = InferenceClient(
                   model='Qwen/Qwen2.5-7B-Instruct',
                   token=token
@@ -122,8 +118,8 @@ jobs:
               )
               raw_content = response.choices[0].message.content.strip()
               
-              # Robuste JSON-Extraktion per Regex (ignoriert Text-Reste des Modells)
               json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
+              parsed = {}
               if json_match:
                   try:
                       parsed = json.loads(json_match.group(0))
@@ -137,7 +133,7 @@ jobs:
                   diff_data = ''
 
               if is_snapshot_req:
-                  snapshot_text = parsed.get('snapshot_content', '# Projekt-Snapshot\n\nKeine Details verfügbar.') if 'parsed' in locals() else '# Fehler'
+                  snapshot_text = parsed.get('snapshot_content', '# Projekt-Snapshot\n\n' + raw_content)
                   with open('project_snapshot.md', 'w', encoding='utf-8') as f:
                       f.write(snapshot_text)
                   diff_data = 'project_snapshot.md aktualisiert.'
@@ -163,25 +159,43 @@ jobs:
 
           except Exception as e:
               status = 'FEHLER'
-              answer = str(e)
-              print(f'Fehler: {e}')
+              error_occurred = True
+              answer = f'Absturz im Agenten: {str(e)}'
+              print(f'Fehler aufgetreten: {e}')
+              try:
+                  memory_file = 'memory.json'
+                  history = []
+                  if os.path.exists(memory_file):
+                      with open(memory_file, 'r', encoding='utf-8') as f:
+                          history = json.load(f)
+                  history.append({'cmd': command, 'ans': answer, 'diff': ''})
+                  with open(memory_file, 'w', encoding='utf-8') as f:
+                      json.dump(history, f, ensure_ascii=False, indent=2)
+              except:
+                  pass
 
+          # Benachrichtigungsdatei wird GARANTIERT am Ende geschrieben (Erfolg oder genaue Fehlermeldung)
           duration = round(time.time() - start_time, 2)
-          notif_text = f'🤖 JARVIS [{status}] • Lauf #{quota_data[\"cloud_runs\"]} ({duration}s)\n{answer[:100]}'
+          notif_text = f'🤖 JARVIS [{status}] • Lauf #{quota_data.get(\"cloud_runs\", 1)} ({duration}s)\n{answer}'
           with open('/tmp/jarvis_notif.txt', 'w', encoding='utf-8') as f:
               f.write(notif_text)
+
+          if error_occurred:
+              exit(1)
           "
 
       - name: Änderungen committen & pushen
+        if: always()
         run: |
           git config --global user.name 'JARVIS Cloud Agent'
           git config --global user.email 'agent@jarvis.local'
           git add memory.json quota.json snapshot_meta.json project_snapshot.md 2>/dev/null || true
           git diff --quiet && git diff --staged --quiet || (git commit -m '🤖 [HF Agent] Update' && git push)
 
-      - name: Benachrichtigung senden
+      - name: Benachrichtigung senden (Erst am Ende bei Fertigstellung oder Fehler)
+        if: always()
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
           TOPIC="${NTFY_TOPIC:-jarvis-status-GR-998877}"
-          curl -s -X POST "[https://ntfy.sh/$TOPIC](https://ntfy.sh/$TOPIC)" --data-binary "@/tmp/jarvis_notif.txt"
+          curl -s -X POST "https://ntfy.sh/$TOPIC" --data-binary "@/tmp/jarvis_notif.txt"
