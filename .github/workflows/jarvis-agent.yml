@@ -35,13 +35,13 @@ jobs:
           MANUAL_PROMPT: ${{ github.event.inputs.prompt }}
         run: python agent.py
 
-      - name: 4. Git Commit & Push (State Sync)
+      - name: 4. Git Commit & Push (Voller State & Skill Sync)
         if: always()
         run: |
           git config --global user.name "JARVIS Cloud Agent"
           git config --global user.email "jarvis@autonomous.local"
-          git add memory.json || true
-          git commit -m "chore(jarvis): update memory state [skip ci]" || echo "No changes to commit"
+          git add memory.json instructions.md *.py || true
+          git commit -m "feat(jarvis): autonomous state, skill & memory update [skip ci]" || echo "No changes to commit"
           git pull --rebase origin main || true
           git push origin main || true
 
