@@ -1,4 +1,8 @@
-import os, json, time, requests, sys
+import os
+import json
+import time
+import requests
+import sys
 from datetime import datetime, timezone
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
@@ -8,15 +12,24 @@ API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}/v1/chat/compl
 # Eingabe ermitteln
 prompt = os.environ.get("DISPATCH_PROMPT") or os.environ.get("MANUAL_PROMPT") or "Status Check"
 
-# Speicher & Instruktionen laden
+# Speicher & Instruktionen laden (Mit Schutz vor Formatfehlern)
 memory_file = "memory.json"
 instructions_file = "instructions.md"
 
 try:
     with open(memory_file, "r", encoding="utf-8") as f:
-        memory = json.load(f)
+        loaded_data = json.load(f)
+        if isinstance(loaded_data, list):
+            memory = {"history": loaded_data, "status": "idle", "last_updated": ""}
+        elif isinstance(loaded_data, dict):
+            memory = loaded_data
+        else:
+            memory = {"history": [], "status": "idle", "last_updated": ""}
 except Exception:
     memory = {"history": [], "status": "idle", "last_updated": ""}
+
+if "history" not in memory or not isinstance(memory["history"], list):
+    memory["history"] = []
 
 try:
     with open(instructions_file, "r", encoding="utf-8") as f:
@@ -35,7 +48,8 @@ WICHTIGE REGELN FÜR AUTONOMIE & DIFF-AUTHORING:
 
 messages = [{"role": "system", "content": system_prompt}]
 for entry in memory.get("history", [])[-8:]:
-    messages.append({"role": entry.get("role", "user"), "content": entry.get("content", "")})
+    if isinstance(entry, dict):
+        messages.append({"role": entry.get("role", "user"), "content": entry.get("content", "")})
 messages.append({"role": "user", "content": prompt})
 
 # HF API Call mit Retries
@@ -70,7 +84,7 @@ for attempt in range(3):
         status = "error"
         time.sleep(3)
 
-# History & State aktualisieren (Garantierter Write)
+# History & State aktualisieren
 memory["history"].append({"role": "user", "content": prompt, "timestamp": datetime.now(timezone.utc).isoformat()})
 memory["history"].append({"role": "assistant", "content": assistant_reply, "timestamp": datetime.now(timezone.utc).isoformat()})
 memory["status"] = status
@@ -79,5 +93,4 @@ memory["last_updated"] = datetime.now(timezone.utc).isoformat()
 with open(memory_file, "w", encoding="utf-8") as f:
     json.dump(memory, f, indent=2, ensure_ascii=False)
 
-# Exit-Code 0 garantieren, damit Workflow Commit/Ntfy ausführt
 sys.exit(0)
