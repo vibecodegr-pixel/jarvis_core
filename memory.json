@@ -4,8 +4,18 @@
       "role": "assistant",
       "content": "JARVIS Cloud Control initialisiert. System bereit.",
       "timestamp": "2026-08-02T00:00:00Z"
+    },
+    {
+      "role": "user",
+      "content": "hallo",
+      "timestamp": "2026-08-02T11:32:27.856221+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Systemfehler bei Inferenz: HTTPSConnectionPool(host='api-inference.huggingface.co', port=443): Max retries exceeded with url: /models/Qwen/Qwen2.5-7B-Instruct/v1/chat/completions (Caused by NameResolutionError(\"HTTPSConnection(host='api-inference.huggingface.co', port=443): Failed to resolve 'api-inference.huggingface.co' ([Errno -5] No address associated with hostname)\"))",
+      "timestamp": "2026-08-02T11:32:27.856255+00:00"
     }
   ],
-  "status": "idle",
-  "last_updated": "2026-08-02T00:00:00Z"
+  "status": "error",
+  "last_updated": "2026-08-02T11:32:27.856259+00:00"
 }
