@@ -1,14 +1,16 @@
-import os, json, time, requests, sys
+import os
+import json
+import time
+import requests
+import sys
 from datetime import datetime, timezone
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
 MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
-API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}/v1/chat/completions"
+API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
 
-# Eingabe ermitteln
 prompt = os.environ.get("DISPATCH_PROMPT") or os.environ.get("MANUAL_PROMPT") or "Status Check"
 
-# Speicher & Instruktionen laden
 memory_file = "memory.json"
 instructions_file = "instructions.md"
 
@@ -18,59 +20,66 @@ try:
 except Exception:
     memory = {"history": [], "status": "idle", "last_updated": ""}
 
+if not isinstance(memory, dict):
+    memory = {"history": [], "status": "idle", "last_updated": ""}
+if "history" not in memory or not isinstance(memory["history"], list):
+    memory["history"] = []
+
 try:
     with open(instructions_file, "r", encoding="utf-8") as f:
         instructions = f.read()
 except Exception:
-    instructions = "Du bist JARVIS, ein autonomer Agent mit Fähigkeit zur Tool-Erstellung."
+    instructions = "Du bist JARVIS, ein autonomer Agent."
 
 system_prompt = f"""
 {instructions}
 
-WICHTIGE REGELN FÜR AUTONOMIE & DIFF-AUTHORING:
-1. Wenn du eine Aufgabe löst, die Code, ein neues Tool oder eine Skriptänderung erfordert, gib IMMER einen sauberen Code-Diff im Unified-Diff-Format aus, umschlossen von ```diff ... ```.
-2. Antworte präzise, lösungsorientiert und professionell auf Deutsch.
-3. Wenn kein Code geändert werden muss, antworte normal ohne Diff-Block.
+REGELN FÜR DEINE ANTWORTEN:
+1. Antworte präzise, direkt und auf Deutsch auf die Anfrage des Nutzers.
+2. Wenn der Nutzer ein neues Tool oder Skript anfordert, liefere den Code in einem sauberen Diff-Block (```diff ... ```).
 """
 
-messages = [{"role": "system", "content": system_prompt}]
-for entry in memory.get("history", [])[-8:]:
-    messages.append({"role": entry.get("role", "user"), "content": entry.get("content", "")})
-messages.append({"role": "user", "content": prompt})
+full_context = f"System: {system_prompt}\n"
+for entry in memory.get("history", [])[-6:]:
+    if isinstance(entry, dict):
+        role = entry.get("role", "user")
+        content = entry.get("content", "")
+        full_context += f"{role.capitalize()}: {content}\n"
+full_context += f"User: {prompt}\nAssistant:"
 
-# HF API Call mit Retries
 headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
 payload = {
-    "model": MODEL_ID,
-    "messages": messages,
-    "max_tokens": 1500,
-    "temperature": 0.3
+    "inputs": full_context,
+    "parameters": {
+        "max_new_tokens": 1000,
+        "temperature": 0.3,
+        "return_full_text": False
+    }
 }
 
-assistant_reply = "Fehler: Keine Antwort erhalten."
+assistant_reply = "Fehler: Keine Antwort von der KI erhalten."
 status = "success"
 
 for attempt in range(3):
     try:
-        response = requests.post(
-            API_URL,
-            headers=headers,
-            json=payload,
-            timeout=45
-        )
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=45)
         if response.status_code == 200:
             data = response.json()
-            assistant_reply = data["choices"][0]["message"]["content"]
+            if isinstance(data, list) and len(data) > 0 and "generated_text" in data[0]:
+                assistant_reply = data[0]["generated_text"].strip()
+            elif isinstance(data, dict) and "generated_text" in data:
+                assistant_reply = data["generated_text"].strip()
+            else:
+                assistant_reply = str(data)
             status = "success"
             break
         else:
             time.sleep(3)
     except Exception as e:
-        assistant_reply = f"Systemfehler bei Inferenz: {str(e)}"
+        assistant_reply = f"Inferenz-Fehler: {str(e)}"
         status = "error"
         time.sleep(3)
 
-# History & State aktualisieren (Garantierter Write)
 memory["history"].append({"role": "user", "content": prompt, "timestamp": datetime.now(timezone.utc).isoformat()})
 memory["history"].append({"role": "assistant", "content": assistant_reply, "timestamp": datetime.now(timezone.utc).isoformat()})
 memory["status"] = status
@@ -79,5 +88,4 @@ memory["last_updated"] = datetime.now(timezone.utc).isoformat()
 with open(memory_file, "w", encoding="utf-8") as f:
     json.dump(memory, f, indent=2, ensure_ascii=False)
 
-# Exit-Code 0 garantieren, damit Workflow Commit/Ntfy ausführt
 sys.exit(0)
